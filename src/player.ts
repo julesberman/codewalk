@@ -112,7 +112,7 @@ export class WalkthroughPlayer implements vscode.Disposable {
     const document = await vscode.workspace.openTextDocument(fileUri);
     const editor = await vscode.window.showTextDocument(document, {
       preview: false,
-      preserveFocus: false,
+      preserveFocus: true,
     });
 
     const targetRange = new vscode.Range(

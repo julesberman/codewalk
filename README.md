@@ -144,8 +144,10 @@ Commands contributed by the extension:
 
 Default keybindings during playback:
 
-- `Alt+]` moves to the next step
-- `Alt+[` moves to the previous step
+- With focus in the walkthrough sidebar, `]` moves to the next step
+- With focus in the walkthrough sidebar, `[` moves to the previous step
+- With editor focus, `Alt+]` moves to the next step
+- With editor focus, `Alt+[` moves to the previous step
 - `Esc` exits the walkthrough
 
 You can also use the sidebar footer buttons and click any step in the step list to jump directly.

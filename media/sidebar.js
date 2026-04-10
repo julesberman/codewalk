@@ -1,6 +1,11 @@
 (function () {
+  const MAX_STEPS = 4;
+  const PLAYBACK_FOCUSABLE_SELECTOR =
+    'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
   const vscode = acquireVsCodeApi();
   const app = document.getElementById("app");
+  let activeState = null;
+  let lastPlaybackFocusId = null;
 
   window.addEventListener("message", (event) => {
     const message = event.data;
@@ -8,12 +13,63 @@
       return;
     }
 
+    activeState = message.payload;
     render(message.payload);
+  });
+
+  document.addEventListener("focusin", (event) => {
+    if (activeState?.mode !== "playback") {
+      return;
+    }
+
+    const focusTarget = event.target instanceof Element ? event.target.closest("[data-focus-id]") : null;
+    if (!focusTarget) {
+      return;
+    }
+
+    lastPlaybackFocusId = focusTarget.getAttribute("data-focus-id");
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (activeState?.mode !== "playback") {
+      return;
+    }
+
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        vscode.postMessage({ type: "exit" });
+        return;
+      }
+
+      if (event.key === "]") {
+        event.preventDefault();
+        if (activeState.playback.currentStepIndex < activeState.playback.walkthrough.steps.length - 1) {
+          vscode.postMessage({ type: "next" });
+        }
+        return;
+      }
+
+      if (event.key === "[") {
+        event.preventDefault();
+        vscode.postMessage({ type: "previous" });
+        return;
+      }
+    }
+
+    if (event.key === "Tab") {
+      trapPlaybackTab(event);
+    }
   });
 
   function render(state) {
     app.innerHTML = "";
 
+    const shell = element("div", { className: "shell" });
     const stack = element("div", { className: "stack" });
     if (state.mode === "playback" && state.playback) {
       stack.appendChild(renderPlayback(state));
@@ -24,19 +80,22 @@
       stack.appendChild(renderBrowse(state.walkthroughs));
     }
 
-    app.appendChild(stack);
+    shell.appendChild(stack);
+    app.appendChild(shell);
+    syncStepListViewport(shell);
+    restorePlaybackFocus(shell, state);
   }
 
   function renderBrowse(walkthroughs) {
     const panel = element("section", { className: "panel" });
-    panel.appendChild(renderHeader("Walkthroughs", "Open a YAML walkthrough from .walkthroughs/ to begin."));
+    panel.appendChild(renderHeader("", "", "Library"));
 
     if (walkthroughs.length === 0) {
       panel.appendChild(
         box("empty", [
-          element("div", { className: "title", textContent: "No walkthroughs found" }),
+          element("div", { className: "section-title", textContent: "No walkthroughs found" }),
           element("div", {
-            className: "muted",
+            className: "body-copy muted",
             textContent: "Add .walkthroughs/*.yaml under the workspace root to populate this list.",
           }),
         ]),
@@ -56,12 +115,13 @@
           relativePath: walkthrough.relativePath,
         });
       });
-      button.appendChild(element("div", { className: "title", textContent: walkthrough.title }));
-      if (walkthrough.description) {
-        button.appendChild(element("div", { className: "muted", textContent: walkthrough.description }));
-      } else {
-        button.appendChild(element("div", { className: "muted", textContent: walkthrough.relativePath }));
-      }
+      const title = element("div", { className: "item-title", textContent: walkthrough.title });
+      const description = element("div", {
+        className: "body-copy muted",
+        textContent: walkthrough.description || "Open this walkthrough to step through the flow.",
+      });
+      button.appendChild(title);
+      button.appendChild(description);
       list.appendChild(button);
     });
     panel.appendChild(list);
@@ -75,32 +135,37 @@
     const panel = element("section", { className: "panel" });
 
     const topbar = element("div", { className: "playback-topbar" });
+    const topbarRow = element("div", { className: "playback-topbar-row" });
     const closeButton = element("button", {
       className: "icon-button",
+      dataFocusId: "playback-back",
       type: "button",
-      textContent: "Exit",
+      textContent: "Back",
     });
     closeButton.addEventListener("click", () => vscode.postMessage({ type: "exit" }));
-    topbar.appendChild(closeButton);
 
     const headerCopy = element("div", { className: "header-copy" });
-    headerCopy.appendChild(element("div", { className: "title", textContent: walkthrough.title }));
+    topbarRow.appendChild(closeButton);
+    headerCopy.appendChild(element("div", { className: "display-title", textContent: walkthrough.title }));
     if (walkthrough.description) {
       headerCopy.appendChild(
         element("div", {
-          className: "muted description-copy",
+          className: "body-copy muted description-copy",
           textContent: walkthrough.description,
         }),
       );
     }
-    topbar.appendChild(box("card header-card", [headerCopy]));
+    topbar.appendChild(topbarRow);
+    topbar.appendChild(headerCopy);
     panel.appendChild(topbar);
 
-    const stepsCard = box("card", []);
-    const stepList = element("div", { className: "step-list" });
+    const stepList = element("div", {
+      className: walkthrough.steps.length > MAX_STEPS ? "step-list is-scrollable" : "step-list",
+    });
     walkthrough.steps.forEach((step, index) => {
       const button = element("button", {
         className: index === currentStepIndex ? "step-button is-active" : "step-button",
+        dataFocusId: `step-${index}`,
         type: "button",
       });
       button.addEventListener("click", () => vscode.postMessage({ type: "jumpToStep", index }));
@@ -110,14 +175,18 @@
           textContent: `${index + 1}.`,
         }),
       );
-      button.appendChild(document.createTextNode(step.title));
+      button.appendChild(
+        element("span", {
+          className: "step-title",
+          textContent: step.title,
+        }),
+      );
       stepList.appendChild(button);
     });
-    stepsCard.appendChild(stepList);
-    panel.appendChild(stepsCard);
+    panel.appendChild(stepList);
 
-    const explanationCard = box("card explanation-card", [
-      element("div", { className: "title", textContent: currentStep.title }),
+    const explanationCard = box("explanation-block", [
+      element("div", { className: "section-title", textContent: currentStep.title }),
       renderMarkdown(currentStep.explanation),
     ]);
     panel.appendChild(explanationCard);
@@ -125,8 +194,9 @@
     const footer = element("div", { className: "footer" });
     const previousButton = element("button", {
       className: "footer-button",
+      dataFocusId: "playback-previous",
       type: "button",
-      textContent: "Prev",
+      textContent: "[ PREV",
     });
     previousButton.disabled = currentStepIndex === 0;
     previousButton.addEventListener("click", () => vscode.postMessage({ type: "previous" }));
@@ -141,33 +211,121 @@
 
     const nextButton = element("button", {
       className: "footer-button",
+      dataFocusId: "playback-next",
       type: "button",
-      textContent: isLastStep ? "Exit" : "Next",
+      textContent: "NEXT ]",
     });
-    nextButton.addEventListener("click", () =>
-      vscode.postMessage({ type: isLastStep ? "exit" : "next" }),
-    );
+    nextButton.disabled = isLastStep;
+    nextButton.addEventListener("click", () => vscode.postMessage({ type: "next" }));
     footer.appendChild(nextButton);
 
-    panel.appendChild(box("card", [footer]));
+    panel.appendChild(footer);
     return panel;
   }
 
+  function syncStepListViewport(root) {
+    const stepList = root.querySelector(".step-list");
+    if (!stepList) {
+      return;
+    }
+
+    if (!stepList.classList.contains("is-scrollable")) {
+      stepList.style.removeProperty("max-height");
+      stepList.scrollTop = 0;
+      return;
+    }
+
+    const buttons = Array.from(stepList.querySelectorAll(".step-button"));
+    const visibleButtons = buttons.slice(0, MAX_STEPS);
+    const maxHeight = visibleButtons.reduce((height, button) => height + button.offsetHeight, 0);
+    stepList.style.maxHeight = `${maxHeight}px`;
+
+    const activeButton = stepList.querySelector(".step-button.is-active");
+    if (!activeButton) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      activeButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+
+  function restorePlaybackFocus(root, state) {
+    if (state.mode !== "playback") {
+      lastPlaybackFocusId = null;
+      return;
+    }
+
+    const focusId = lastPlaybackFocusId ?? "playback-next";
+    const target =
+      root.querySelector(`[data-focus-id="${focusId}"]`) ??
+      root.querySelector('[data-focus-id="playback-next"]') ??
+      root.querySelector(PLAYBACK_FOCUSABLE_SELECTOR);
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      target.focus();
+    });
+  }
+
+  function trapPlaybackTab(event) {
+    const playbackPanel = app.querySelector(".panel");
+    if (!playbackPanel) {
+      return;
+    }
+
+    const focusableElements = Array.from(playbackPanel.querySelectorAll(PLAYBACK_FOCUSABLE_SELECTOR)).filter(
+      (element) => element instanceof HTMLElement,
+    );
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const currentIndex = focusableElements.indexOf(document.activeElement);
+    const nextIndex = event.shiftKey
+      ? currentIndex <= 0
+        ? focusableElements.length - 1
+        : currentIndex - 1
+      : currentIndex === -1 || currentIndex === focusableElements.length - 1
+        ? 0
+        : currentIndex + 1;
+
+    event.preventDefault();
+    focusableElements[nextIndex].focus();
+  }
+
   function renderError(error) {
-    return box("card error", [
-      element("div", { className: "title", textContent: error.title }),
+    return box("error", [
+      element("div", { className: "section-label", textContent: "Error" }),
+      element("div", { className: "section-title", textContent: error.title }),
       error.fileName
-        ? element("div", { className: "muted", textContent: error.fileName })
+        ? element("div", { className: "item-meta", textContent: error.fileName })
         : null,
-      element("div", { textContent: error.detail }),
+      element("div", { className: "body-copy", textContent: error.detail }),
     ]);
   }
 
-  function renderHeader(title, description) {
+  function renderHeader(title, description, eyebrow) {
     const wrapper = element("div", { className: "header-copy" });
-    wrapper.appendChild(element("div", { className: "title", textContent: title }));
-    wrapper.appendChild(element("div", { className: "muted", textContent: description }));
+    if (eyebrow) {
+      wrapper.appendChild(element("div", { className: "eyebrow", textContent: eyebrow }));
+    }
+    if (title) {
+      wrapper.appendChild(element("div", { className: "display-title", textContent: title }));
+    }
+    if (description) {
+      wrapper.appendChild(element("div", { className: "body-copy muted", textContent: description }));
+    }
     return wrapper;
+  }
+
+  function section(title, child) {
+    return box("section-block", [
+      element("div", { className: "section-label", textContent: title }),
+      child,
+    ]);
   }
 
   function renderMarkdown(markdown) {
@@ -306,6 +464,9 @@
     const node = document.createElement(tagName);
     if (options.className) {
       node.className = options.className;
+    }
+    if (options.dataFocusId) {
+      node.setAttribute("data-focus-id", options.dataFocusId);
     }
     if (options.textContent !== undefined) {
       node.textContent = options.textContent;
