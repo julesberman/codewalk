@@ -1,0 +1,330 @@
+title: Request lifecycle
+description: A granular tour of routes.ts, following the demo request path almost line by line.
+steps:
+  - title: Route dependencies
+    file: src/routes.ts
+    range:
+      start: 1
+      end: 16
+    explanation: |
+      The file starts by importing request types, audit helpers, middleware
+      gates, and project operations. That sets up `routes.ts` as the place
+      where orchestration happens rather than low-level business logic.
+
+  - title: Scenario shape
+    file: src/routes.ts
+    range:
+      start: 18
+      end: 23
+    explanation: |
+      `DemoScenario` pairs a human-readable description with a concrete
+      `RequestContext`, and `RouteHandler` makes every handler return the same
+      `ResponseShape`.
+
+  - title: Scenario table start
+    file: src/routes.ts
+    range:
+      start: 25
+      end: 35
+    explanation: |
+      `demoScenarios` is the in-file fixture table. The first entry models a
+      reader listing projects with a simple `GET /api/projects` request.
+
+  - title: Create project scenario
+    file: src/routes.ts
+    range:
+      start: 37
+      end: 52
+    explanation: |
+      The second scenario carries the admin token plus the `name`, `slug`,
+      and `tier` body fields needed by the create-project path.
+
+  - title: Open incident scenario
+    file: src/routes.ts
+    range:
+      start: 53
+      end: 71
+    explanation: |
+      The third scenario targets a nested incident route. It includes both a
+      URL with `projectId` and a payload with `summary` and `severity`.
+
+  - title: Default example
+    file: src/routes.ts
+    range:
+      start: 73
+      end: 75
+    explanation: |
+      `runExample` chooses `createProject` as the default demo path, so the
+      sample walkthrough begins with a request that mutates state.
+
+  - title: Scenario execution
+    file: src/routes.ts
+    range:
+      start: 77
+      end: 81
+    explanation: |
+      `runScenario` looks up a fixture, routes its request, then combines the
+      scenario description with the formatted response string.
+
+  - title: Router entry
+    file: src/routes.ts
+    range:
+      start: 83
+      end: 85
+    explanation: |
+      `routeRequest` starts by normalizing the incoming path once and storing
+      it before any matcher logic runs.
+
+  - title: Collection route matchers
+    file: src/routes.ts
+    range:
+      start: 85
+      end: 87
+    explanation: |
+      The first two matcher entries handle the collection route:
+      `GET /api/projects` for listing and `POST /api/projects` for creation.
+
+  - title: Detail route matcher
+    file: src/routes.ts
+    range:
+      start: 88
+      end: 93
+    explanation: |
+      The next matcher uses a regex to recognize a single project detail URL
+      like `/api/projects/proj_100`.
+
+  - title: Incident route matcher
+    file: src/routes.ts
+    range:
+      start: 94
+      end: 100
+    explanation: |
+      The final matcher recognizes the nested incident creation route and
+      sends those requests to `handleOpenIncident`.
+
+  - title: Matcher loop
+    file: src/routes.ts
+    range:
+      start: 102
+      end: 106
+    explanation: |
+      The router walks the matcher table in order. On the first hit, it builds
+      a normalized route context and immediately invokes that handler.
+
+  - title: Fallback 404
+    file: src/routes.ts
+    range:
+      start: 108
+      end: 112
+    explanation: |
+      If no matcher succeeds, the route layer returns a `404` body that
+      includes the method and normalized path for quick debugging.
+
+  - title: List handler auth
+    file: src/routes.ts
+    range:
+      start: 114
+      end: 116
+    explanation: |
+      `handleListProjects` wraps its logic in `runAuthenticated`, so every
+      list request is forced through the shared auth pipeline first.
+
+  - title: List projection
+    file: src/routes.ts
+    range:
+      start: 116
+      end: 120
+    explanation: |
+      After auth, the handler loads projects for the caller’s org and maps
+      them into compact one-line summaries.
+
+  - title: List response
+    file: src/routes.ts
+    range:
+      start: 122
+      end: 126
+    explanation: |
+      The list handler returns `200` and joins the per-project lines with
+      newlines so the demo reads like a tiny CLI response.
+
+  - title: Detail param read
+    file: src/routes.ts
+    range:
+      start: 129
+      end: 138
+    explanation: |
+      `handleProjectDetail` pulls `projectId` from `params` and exits early
+      with `400` if the router did not produce one.
+
+  - title: Detail lookup
+    file: src/routes.ts
+    range:
+      start: 140
+      end: 148
+    explanation: |
+      The handler verifies org access first, then loads the project and turns
+      a miss into a `404 Project not found.` response.
+
+  - title: Detail response
+    file: src/routes.ts
+    range:
+      start: 150
+      end: 154
+    explanation: |
+      A successful detail read returns `200` plus the string built by
+      `formatProject`.
+
+  - title: Create auth gate
+    file: src/routes.ts
+    range:
+      start: 157
+      end: 163
+    explanation: |
+      `handleCreateProject` authenticates the caller, requires admin write
+      access, and reads the body fields that the project factory expects.
+
+  - title: Create persistence
+    file: src/routes.ts
+    range:
+      start: 165
+      end: 171
+    explanation: |
+      The new project payload is assembled from validated request data plus
+      the authenticated user’s `id` and `orgId`.
+
+  - title: Create audit write
+    file: src/routes.ts
+    range:
+      start: 173
+      end: 180
+    explanation: |
+      After persistence, the route records a `project.created` audit entry and
+      includes the new slug as metadata.
+
+  - title: Create response
+    file: src/routes.ts
+    range:
+      start: 182
+      end: 186
+    explanation: |
+      The create flow finishes with `201` and a body that echoes the project
+      name and generated id.
+
+  - title: Incident auth gate
+    file: src/routes.ts
+    range:
+      start: 189
+      end: 201
+    explanation: |
+      `handleOpenIncident` mirrors the create flow but checks incident-write
+      permissions, requires `projectId`, and confirms org ownership.
+
+  - title: Incident creation
+    file: src/routes.ts
+    range:
+      start: 203
+      end: 210
+    explanation: |
+      The handler validates `summary`, parses an optional severity, and hands
+      the normalized input to `openIncident`.
+
+  - title: Incident audit write
+    file: src/routes.ts
+    range:
+      start: 212
+      end: 220
+    explanation: |
+      The audit event captures the incident id and also records the
+      associated project id and final severity in metadata.
+
+  - title: Incident response
+    file: src/routes.ts
+    range:
+      start: 222
+      end: 226
+    explanation: |
+      A successful incident open returns `201` with a body that repeats the
+      incident id, target project, and severity.
+
+  - title: Route context merge
+    file: src/routes.ts
+    range:
+      start: 229
+      end: 242
+    explanation: |
+      `buildRouteContext` reuses the original request but replaces the path
+      with its normalized version and merges extracted params with any
+      existing params already present on the context.
+
+  - title: Incident param extraction
+    file: src/routes.ts
+    range:
+      start: 244
+      end: 248
+    explanation: |
+      `extractParams` first checks the more specific incident regex so nested
+      routes can surface `projectId` before the generic project matcher runs.
+
+  - title: Project param extraction
+    file: src/routes.ts
+    range:
+      start: 250
+      end: 255
+    explanation: |
+      If the path is just a project detail URL, the second regex extracts the
+      same `projectId`; otherwise the helper returns an empty object.
+
+  - title: Path normalization
+    file: src/routes.ts
+    range:
+      start: 258
+      end: 264
+    explanation: |
+      `normalizePath` trims a trailing slash from non-root paths so route
+      matching does not have to care about `/api/projects/` versus
+      `/api/projects`.
+
+  - title: Required body fields
+    file: src/routes.ts
+    range:
+      start: 266
+      end: 276
+    explanation: |
+      `readRequiredString` centralizes body validation. It rejects missing,
+      non-string, or whitespace-only values and returns a trimmed string.
+
+  - title: Optional tier parser
+    file: src/routes.ts
+    range:
+      start: 278
+      end: 288
+    explanation: |
+      `readOptionalTier` allows omission but constrains present values to the
+      three supported project tiers.
+
+  - title: Optional severity parser
+    file: src/routes.ts
+    range:
+      start: 290
+      end: 302
+    explanation: |
+      `readOptionalSeverity` applies the same pattern for incidents, accepting
+      only `low`, `medium`, or `high`.
+
+  - title: Project formatter
+    file: src/routes.ts
+    range:
+      start: 304
+      end: 310
+    explanation: |
+      The detail formatter turns a `ProjectRecord` into a four-line summary
+      showing the id, tier, environment, and current health status.
+
+  - title: Response formatter
+    file: src/routes.ts
+    range:
+      start: 313
+      end: 315
+    explanation: |
+      `formatResponse` appends the current audit-log length to every response
+      summary, making side effects visible at the end of the walkthrough.

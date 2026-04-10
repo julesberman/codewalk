@@ -1,0 +1,49 @@
+title: Project creation flow
+description: Follow an admin request from route matching to persistence and audit logging.
+steps:
+  - title: Scenario request
+    file: src/routes.ts
+    range:
+      start: 37
+      end: 51
+    explanation: |
+      The `createProject` scenario sends a `POST /api/projects` request with
+      an admin token and the body fields needed to create a new project.
+
+  - title: Create handler
+    file: src/routes.ts
+    range:
+      start: 157
+      end: 185
+    explanation: |
+      The handler authenticates the request, requires admin-level project
+      write access, validates the body payload, persists the project, and
+      records an audit event before returning `201`.
+
+  - title: Permission gate
+    file: src/middleware.ts
+    range:
+      start: 58
+      end: 60
+    explanation: |
+      `requireAdminAccess` combines a role check with a scope check so the
+      route can express "admin write permission" as a single operation.
+
+  - title: Project persistence
+    file: src/projects.ts
+    range:
+      start: 66
+      end: 86
+    explanation: |
+      `createProject` builds a new in-memory record, applies defaults like
+      staging plus healthy status, and appends it to the demo dataset.
+
+  - title: Audit trail
+    file: src/audit.ts
+    range:
+      start: 14
+      end: 26
+    explanation: |
+      The audit helper enriches the event with the authenticated actor and
+      request id so side effects can be inspected separately from the main
+      response.

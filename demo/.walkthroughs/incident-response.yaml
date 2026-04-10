@@ -1,0 +1,51 @@
+title: Incident response flow
+description: Follow an incident-manager request that escalates a production issue.
+steps:
+  - title: Incident scenario
+    file: src/routes.ts
+    range:
+      start: 53
+      end: 69
+    explanation: |
+      The `openIncident` scenario targets a specific project route and carries
+      a summary plus severity, which makes the walkthrough feel closer to a
+      real operational request.
+
+  - title: Route context params
+    file: src/routes.ts
+    range:
+      start: 229
+      end: 255
+    explanation: |
+      Before the handler runs, the router derives `projectId` from the URL and
+      merges it into the request context so downstream code can treat it like
+      any other route param.
+
+  - title: Incident handler
+    file: src/routes.ts
+    range:
+      start: 189
+      end: 225
+    explanation: |
+      The incident route requires a manager-capable user, verifies project
+      ownership, validates the request body, opens the incident, and records
+      an audit event.
+
+  - title: Project ownership check
+    file: src/middleware.ts
+    range:
+      start: 23
+      end: 32
+    explanation: |
+      `assertProjectAccess` prevents users from opening incidents on projects
+      outside their organization and also catches missing project ids early.
+
+  - title: Incident side effects
+    file: src/projects.ts
+    range:
+      start: 89
+      end: 112
+    explanation: |
+      `openIncident` stores a new incident record, increments the project’s
+      incident count, and upgrades project health to `critical` when severity
+      is high.

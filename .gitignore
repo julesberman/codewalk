@@ -1,0 +1,50 @@
+# Based on https://github.com/microsoft/TypeScript/blob/main/.gitignore
+
+# Dependencies
+node_modules/
+.node_modules/
+
+# Build output
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage and test artifacts
+coverage/
+.nyc_output/
+.vscode-test/
+TEST-results.xml
+
+# Logs and caches
+*.log
+*.log.*
+*.pid
+*.seed
+*.pid.lock
+*.out
+*.err
+.eslintcache
+*v8.log
+
+# Editors and OS files
+.DS_Store
+**/.DS_Store
+.idea/
+.settings/
+.vs/
+.history/
+*.swp
+*.swo
+.#*
+\#*\#
+
+# VS Code workspace-local files
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Extension packaging artifacts
+*.vsix

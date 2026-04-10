@@ -1,0 +1,6 @@
+.vscode/**
+.git/**
+.github/**
+out/test/**/*.js.map
+test/**
+PLAN.md
