@@ -6,6 +6,7 @@ It includes:
 
 - sample source files under `src/`
 - walkthrough files under `.walkthroughs/`
+- two intentionally broken walkthroughs for validation and error-state testing
 - a longer `src/routes.ts` with several realistic demo endpoints
 
 Open this folder in the Extension Development Host window to try the extension immediately.

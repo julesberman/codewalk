@@ -2,11 +2,14 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import {
+  getEditorTopPaddingLines,
+  getExplanationPanelOpenByDefault,
+} from "./config";
 import { DecorationsManager } from "./decorations";
 import {
   type PlaybackState,
   type ValidatedWalkthrough,
-  type WalkthroughSummary,
 } from "./types";
 
 export interface PlayerObserver {
@@ -20,7 +23,7 @@ export class WalkthroughPlayer implements vscode.Disposable {
     private readonly workspaceRoot: string,
     private readonly decorations: DecorationsManager,
     private readonly observer: PlayerObserver,
-  ) {}
+  ) { }
 
   public getState(): PlaybackState | null {
     return this.activeState;
@@ -31,6 +34,7 @@ export class WalkthroughPlayer implements vscode.Disposable {
     this.activeState = {
       walkthrough,
       currentStepIndex: 0,
+      explanationPanelVisible: getExplanationPanelOpenByDefault(),
     };
     await this.revealCurrentStep();
   }
@@ -77,6 +81,23 @@ export class WalkthroughPlayer implements vscode.Disposable {
     await this.revealCurrentStep();
   }
 
+  public async toggleExplanationPanel(): Promise<void> {
+    if (!this.activeState) {
+      return;
+    }
+
+    await this.setExplanationPanelVisible(!this.activeState.explanationPanelVisible);
+  }
+
+  public async setExplanationPanelVisible(visible: boolean): Promise<void> {
+    if (!this.activeState || this.activeState.explanationPanelVisible === visible) {
+      return;
+    }
+
+    this.activeState.explanationPanelVisible = visible;
+    this.observer.onPlaybackStateChanged(this.activeState);
+  }
+
   public async restoreDecorationsForVisibleEditor(editor: vscode.TextEditor | undefined): Promise<void> {
     if (!editor || !this.activeState) {
       return;
@@ -102,6 +123,24 @@ export class WalkthroughPlayer implements vscode.Disposable {
     this.decorations.dispose();
   }
 
+  public async refreshPresentation(): Promise<void> {
+    if (!this.activeState) {
+      return;
+    }
+
+    this.decorations.refreshStyles();
+    const step = this.activeState.walkthrough.steps[this.activeState.currentStepIndex];
+    const editor = vscode.window.visibleTextEditors.find((candidate) =>
+      this.decorations.matchesEditor(candidate, this.workspaceRoot, step),
+    );
+
+    if (editor) {
+      this.decorations.apply(editor, step);
+    }
+
+    this.observer.onPlaybackStateChanged(this.activeState);
+  }
+
   private async revealCurrentStep(): Promise<void> {
     if (!this.activeState) {
       return;
@@ -120,10 +159,14 @@ export class WalkthroughPlayer implements vscode.Disposable {
       new vscode.Position(step.range.end - 1, 0),
     );
     const caretPosition = document.lineAt(step.range.end - 1).range.end;
+    const topPaddingLines = getEditorTopPaddingLines();
+    const revealLine = Math.max(0, step.range.start - 1 - topPaddingLines);
+    const revealRange = document.lineAt(revealLine).range;
 
     editor.selection = new vscode.Selection(caretPosition, caretPosition);
-    editor.revealRange(targetRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    editor.revealRange(revealRange, vscode.TextEditorRevealType.AtTop);
     this.decorations.apply(editor, step);
+    editor.revealRange(targetRange, vscode.TextEditorRevealType.Default);
     this.observer.onPlaybackStateChanged(this.activeState);
   }
 }

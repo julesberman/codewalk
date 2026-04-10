@@ -5,6 +5,7 @@ import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import * as yaml from "js-yaml";
 
 import schema from "../walkthrough.schema.json";
+import { getWalkLibraryLocation, toAbsoluteLibraryPath } from "./config";
 import {
   type ValidatedWalkthrough,
   type WalkthroughDocument,
@@ -28,7 +29,8 @@ export class WalkthroughLoader {
   public constructor(private readonly workspaceRoot: string) {}
 
   public async discoverWalkthroughs(): Promise<WalkthroughSummary[]> {
-    const walkthroughDir = path.join(this.workspaceRoot, ".walkthroughs");
+    const libraryLocation = getWalkLibraryLocation();
+    const walkthroughDir = toAbsoluteLibraryPath(this.workspaceRoot);
     let entries: string[];
 
     try {
@@ -42,41 +44,82 @@ export class WalkthroughLoader {
       throw error;
     }
 
-    const candidates = entries
-      .filter((entry) => entry.endsWith(".yaml") || entry.endsWith(".yml"))
-      .sort((left, right) => left.localeCompare(right));
+    const candidates = entries.filter((entry) => entry.endsWith(".yaml") || entry.endsWith(".yml"));
 
-    return Promise.all(
+    const summaries = await Promise.all(
       candidates.map(async (fileName) => {
         const absolutePath = path.join(walkthroughDir, fileName);
-        const relativePath = path.posix.join(".walkthroughs", fileName);
+        const relativePath = path.posix.join(libraryLocation, fileName);
         const fallbackTitle = stripExtension(fileName);
+        const stats = await fs.stat(absolutePath);
+        const updatedAt = stats.mtimeMs;
+        const baseSummary = {
+          id: relativePath,
+          fileName,
+          relativePath,
+          title: fallbackTitle,
+          updatedAt,
+        };
 
         try {
           const raw = await fs.readFile(absolutePath, "utf8");
-          const parsed = yaml.load(raw);
+          let parsed: unknown;
+
+          try {
+            parsed = yaml.load(raw);
+          } catch (error) {
+            return {
+              ...baseSummary,
+              error: {
+                title: "Invalid YAML",
+                detail: formatYamlError(error),
+                fileName,
+              },
+            };
+          }
+
+          if (!validateSchema(parsed)) {
+            return {
+              ...baseSummary,
+              error: {
+                title: "Schema validation failed",
+                detail: formatSchemaErrors(validateSchema.errors ?? []),
+                fileName,
+              },
+            };
+          }
+
+          const semanticError = await this.validateSemantics(parsed);
+          if (semanticError) {
+            return {
+              ...baseSummary,
+              error: {
+                title: "Walkthrough validation failed",
+                detail: semanticError,
+                fileName,
+              },
+            };
+          }
+
           if (isRecord(parsed)) {
             const title = getNonEmptyString(parsed.title) ?? fallbackTitle;
             const description = getNonEmptyString(parsed.description);
             return {
-              id: relativePath,
-              fileName,
-              relativePath,
+              ...baseSummary,
               title,
               description,
             };
           }
         } catch {
-          // Invalid files should still appear in browse mode; validation happens on start.
+          // Unreadable files should still appear in browse mode.
         }
 
-        return {
-          id: relativePath,
-          fileName,
-          relativePath,
-          title: fallbackTitle,
-        };
+        return baseSummary;
       }),
+    );
+
+    return summaries.sort(
+      (left, right) => right.updatedAt - left.updatedAt || left.fileName.localeCompare(right.fileName),
     );
   }
 
@@ -206,6 +249,7 @@ export class WalkthroughLoader {
       fileName,
       relativePath: normalized,
       title: stripExtension(fileName),
+      updatedAt: 0,
       absolutePath: path.join(this.workspaceRoot, normalized),
     };
   }

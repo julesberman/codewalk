@@ -3,6 +3,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import { getWalkLibraryLocation } from "./config";
 import {
   type PlaybackState,
   type WalkthroughErrorState,
@@ -11,9 +12,12 @@ import {
 
 export interface SidebarController {
   startWalkthrough(relativePath: string): Promise<void>;
+  editWalkthrough(relativePath: string): Promise<void>;
+  deleteWalkthrough(relativePath: string): Promise<void>;
   next(): Promise<void>;
   previous(): Promise<void>;
   jumpToStep(index: number): Promise<void>;
+  toggleExplanationPanel(): Promise<void>;
   exit(): Promise<void>;
 }
 
@@ -24,6 +28,7 @@ interface SidebarRenderState {
   walkthroughs: WalkthroughSummary[];
   playback: PlaybackState | null;
   error: WalkthroughErrorState | null;
+  libraryLocation: string;
 }
 
 export class SidebarViewProvider implements vscode.WebviewViewProvider {
@@ -35,6 +40,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     walkthroughs: [],
     playback: null,
     error: null,
+    libraryLocation: getWalkLibraryLocation(),
   };
 
   public constructor(
@@ -67,6 +73,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       walkthroughs,
       playback: null,
       error: null,
+      libraryLocation: getWalkLibraryLocation(),
     };
     this.postState();
   }
@@ -77,6 +84,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       walkthroughs,
       playback,
       error: null,
+      libraryLocation: getWalkLibraryLocation(),
     };
     this.postState();
   }
@@ -87,6 +95,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       walkthroughs,
       playback: null,
       error,
+      libraryLocation: getWalkLibraryLocation(),
     };
     this.postState();
   }
@@ -124,6 +133,16 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
           await this.controller.startWalkthrough(message.relativePath);
         }
         return;
+      case "editWalkthrough":
+        if (typeof message.relativePath === "string") {
+          await this.controller.editWalkthrough(message.relativePath);
+        }
+        return;
+      case "deleteWalkthrough":
+        if (typeof message.relativePath === "string") {
+          await this.controller.deleteWalkthrough(message.relativePath);
+        }
+        return;
       case "next":
         await this.controller.next();
         return;
@@ -134,6 +153,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         if (typeof message.index === "number") {
           await this.controller.jumpToStep(message.index);
         }
+        return;
+      case "toggleExplanationPanel":
+        await this.controller.toggleExplanationPanel();
         return;
       case "exit":
         await this.controller.exit();

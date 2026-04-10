@@ -3,6 +3,7 @@
   --ui-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --ui-sans: var(--vscode-font-family);
   --ui-mono: var(--vscode-editor-font-family);
+  --sidebar-explanation-font-size: 1.02rem;
   --page-pad-inline: 0px;
   --page-pad-block: 20px;
   --column-width: 100%;
@@ -64,6 +65,7 @@ a:hover {
 .step-list,
 .markdown,
 .explanation-block,
+.summary-block,
 .empty,
 .error {
   display: grid;
@@ -81,6 +83,7 @@ a:hover {
 .playback-topbar,
 .playback-topbar-row,
 .explanation-block,
+.summary-block,
 .empty,
 .error {
   gap: 8px;
@@ -89,6 +92,10 @@ a:hover {
 .walkthrough-list,
 .step-list {
   border-top: 1px solid var(--rule-color);
+}
+
+.walkthrough-list {
+  display: grid;
 }
 
 .step-list {
@@ -101,6 +108,7 @@ a:hover {
 }
 
 .walkthrough-button,
+.walkthrough-action-button,
 .step-button,
 .icon-button,
 .footer-button {
@@ -116,6 +124,7 @@ a:hover {
 }
 
 .walkthrough-button:focus-visible,
+.walkthrough-action-button:focus-visible,
 .step-button:focus-visible,
 .icon-button:focus-visible,
 .footer-button:focus-visible,
@@ -144,6 +153,36 @@ a:focus-visible {
   color: var(--muted-color);
 }
 
+.browse-eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.browse-eyebrow-label {
+  flex: 0 0 auto;
+  font-size: 1.16em;
+  color: var(--vscode-textLink-foreground, var(--active-color));
+}
+
+.browse-eyebrow-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ui-mono);
+  font-size: 0.95em;
+  letter-spacing: 0.02em;
+  font-style: italic;
+  text-transform: lowercase;
+  color: var(--muted-color);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, var(--muted-color) 70%, transparent);
+  text-underline-offset: 0.18em;
+}
+
 .display-title,
 .section-title {
   margin: 0;
@@ -157,6 +196,10 @@ a:focus-visible {
   font-size: clamp(1.75rem, 1.55rem + 0.8vw, 2.25rem);
 }
 
+.error-title {
+  color: var(--vscode-errorForeground);
+}
+
 .section-title {
   font-size: 1.35rem;
   max-width: 22ch;
@@ -166,16 +209,104 @@ a:focus-visible {
   max-width: 64ch;
 }
 
+.walkthrough-item {
+  display: grid;
+  gap: 10px;
+  position: relative;
+  padding: 14px 0 15px;
+  border-bottom: 1px solid var(--rule-color);
+}
+
 .walkthrough-button {
   display: grid;
   gap: 5px;
   width: 100%;
-  padding: 14px 0 15px;
+  padding: 0 36px 0 0;
   text-align: left;
-  border-bottom: 1px solid var(--rule-color);
+}
+
+.walkthrough-actions {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 14px;
+  right: 0;
+  gap: 6px;
+}
+
+.walkthrough-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--rule-color);
+  border-radius: 6px;
+}
+
+.walkthrough-action-button.is-danger {
+  color: var(--vscode-errorForeground);
+}
+
+.walkthrough-action-icon {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+}
+
+.walkthrough-action-icon-edit::before,
+.walkthrough-action-icon-edit::after,
+.walkthrough-action-icon-delete::before,
+.walkthrough-action-icon-delete::after {
+  content: "";
+  position: absolute;
+}
+
+.walkthrough-action-icon-edit::before {
+  top: 1px;
+  left: 4px;
+  width: 3px;
+  height: 9px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+.walkthrough-action-icon-edit::after {
+  top: 7px;
+  left: 1px;
+  width: 0;
+  height: 0;
+  border-left: 2.5px solid transparent;
+  border-right: 2.5px solid transparent;
+  border-top: 3px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.walkthrough-action-icon-delete::before {
+  top: 4px;
+  left: 2.5px;
+  width: 7px;
+  height: 6px;
+  border: 1.5px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+}
+
+.walkthrough-action-icon-delete::after {
+  top: 2px;
+  left: 1.5px;
+  width: 9px;
+  height: 2px;
+  border-top: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  border-radius: 1px;
 }
 
 .walkthrough-button:hover,
+.walkthrough-action-button:hover,
 .step-button:hover,
 .icon-button:hover,
 .footer-button:enabled:hover {
@@ -188,13 +319,24 @@ a:focus-visible {
   line-height: 1.25;
 }
 
+.item-title-broken {
+  color: var(--vscode-errorForeground);
+}
+
+.item-copy-broken {
+  color: var(--vscode-errorForeground);
+}
+
 .playback-topbar {
   gap: 6px;
 }
 
 .playback-topbar-row {
-  grid-template-columns: auto;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
   align-items: center;
+  min-height: 32px;
+  padding-block: 4px;
 }
 
 .description-copy {
@@ -202,8 +344,12 @@ a:focus-visible {
 }
 
 .icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   justify-self: start;
-  padding: 0;
+  padding-block: 2px;
+  min-height: 24px;
   font-family: var(--ui-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -212,6 +358,42 @@ a:focus-visible {
 
 .icon-button::before {
   content: "\2190  ";
+}
+
+.is-panel-toggle::before {
+  content: "";
+}
+
+.panel-toggle-icon {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+.panel-toggle-icon::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 3px;
+  border-radius: 1px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.panel-toggle-icon::after {
+  content: none;
+}
+
+.is-panel-toggle.is-toggled {
+  color: color-mix(in srgb, var(--active-color) 88%, var(--vscode-foreground));
+}
+
+.is-panel-toggle.is-toggled .panel-toggle-icon::before {
+  background: currentColor;
 }
 
 .section-block {
@@ -257,7 +439,12 @@ a:focus-visible {
 .markdown {
   gap: 12px;
   max-width: 64ch;
+  font-size: var(--sidebar-explanation-font-size);
   line-height: 1.65;
+}
+
+.summary-block {
+  gap: 6px;
 }
 
 .markdown p,
@@ -341,8 +528,8 @@ a:focus-visible {
   border-top: 1px solid var(--rule-color);
 }
 
-.error {
-  color: var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+.error-label {
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, var(--vscode-foreground)));
 }
 
 @media (prefers-reduced-motion: reduce) {

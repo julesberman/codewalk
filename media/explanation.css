@@ -1,0 +1,128 @@
+:root {
+  color-scheme: light dark;
+  --ui-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --ui-sans: var(--vscode-font-family);
+  --ui-mono: var(--vscode-editor-font-family);
+  --panel-explanation-font-size: 1.08rem;
+  --rule-color: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+  --surface-color: color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-sideBar-background));
+  --muted-color: color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-editor-background));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--ui-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vscode-foreground);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--vscode-editor-background) 94%, var(--vscode-sideBar-background)) 0%, var(--vscode-editor-background) 100%);
+}
+
+a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+.page {
+  display: grid;
+  gap: 20px;
+  max-width: 82ch;
+  padding: 28px 28px 40px;
+}
+
+.header {
+  display: grid;
+  gap: 8px;
+}
+
+.eyebrow,
+.meta {
+  font-family: var(--ui-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.title,
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 0;
+  font-family: var(--ui-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.title {
+  font-size: clamp(1.55rem, 1.4rem + 0.8vw, 2rem);
+  max-width: 24ch;
+}
+
+.content {
+  padding-top: 18px;
+  border-top: 1px solid var(--rule-color);
+}
+
+.markdown {
+  display: grid;
+  gap: 14px;
+  font-size: var(--panel-explanation-font-size);
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown pre,
+.markdown blockquote,
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 0;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.2rem;
+}
+
+.markdown li + li {
+  margin-top: 0.3rem;
+}
+
+.markdown code {
+  font-family: var(--ui-mono);
+  font-size: 0.93em;
+  padding: 0.08rem 0.22rem;
+  background: var(--surface-color);
+}
+
+.markdown pre {
+  overflow: auto;
+  padding: 12px 14px;
+  background: var(--surface-color);
+  border: 1px solid var(--rule-color);
+}
+
+.markdown pre code {
+  padding: 0;
+  background: transparent;
+}

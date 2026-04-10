@@ -2,18 +2,12 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import { getDimmingStrength, getHighlightColor } from "./config";
 import { type WalkthroughStep } from "./types";
 
 export class DecorationsManager implements vscode.Disposable {
-  private readonly activeDecoration = vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    backgroundColor: new vscode.ThemeColor("editor.wordHighlightBackground"),
-  });
-
-  private readonly inactiveDecoration = vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    opacity: "0.72",
-  });
+  private activeDecoration = this.createActiveDecoration();
+  private inactiveDecoration = this.createInactiveDecoration();
 
   public apply(editor: vscode.TextEditor, step: WalkthroughStep): void {
     this.clear();
@@ -34,6 +28,14 @@ export class DecorationsManager implements vscode.Disposable {
     }
   }
 
+  public refreshStyles(): void {
+    this.clear();
+    this.activeDecoration.dispose();
+    this.inactiveDecoration.dispose();
+    this.activeDecoration = this.createActiveDecoration();
+    this.inactiveDecoration = this.createInactiveDecoration();
+  }
+
   public matchesEditor(editor: vscode.TextEditor, workspaceRoot: string, step: WalkthroughStep): boolean {
     const expected = path.normalize(path.join(workspaceRoot, step.file));
     return path.normalize(editor.document.uri.fsPath) === expected;
@@ -43,6 +45,20 @@ export class DecorationsManager implements vscode.Disposable {
     this.clear();
     this.activeDecoration.dispose();
     this.inactiveDecoration.dispose();
+  }
+
+  private createActiveDecoration(): vscode.TextEditorDecorationType {
+    return vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
+      backgroundColor: getHighlightColor(),
+    });
+  }
+
+  private createInactiveDecoration(): vscode.TextEditorDecorationType {
+    return vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
+      opacity: String(getDimmingStrength()),
+    });
   }
 }
 

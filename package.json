@@ -30,7 +30,7 @@
       "activitybar": [
         {
           "id": "walkthrough",
-          "title": "Walkthrough",
+          "title": "CodeWalk",
           "icon": "media/activity-icon.svg"
         }
       ]
@@ -39,7 +39,7 @@
       "walkthrough": [
         {
           "id": "walkthrough.sidebar",
-          "name": "Code Walkthrough",
+          "name": "",
           "type": "webview"
         }
       ]
@@ -62,6 +62,45 @@
         "title": "Walkthrough: Exit"
       }
     ],
+    "configuration": {
+      "title": "Code Walkthrough",
+      "properties": {
+        "walkthrough.editorTopPaddingLines": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "description": "How many lines above the active walkthrough range should remain visible when a step is focused."
+        },
+        "walkthrough.dimmingStrength": {
+          "type": "number",
+          "default": 0.62,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity applied to non-highlighted lines during playback."
+        },
+        "walkthrough.highlightColor": {
+          "type": "string",
+          "default": "editor.wordHighlightBackground",
+          "description": "Highlight background color for the active step. Use a VS Code theme color id or a CSS color value like #ffcc00."
+        },
+        "walkthrough.explanationPanelOpenByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the explanation panel opens automatically when a walkthrough starts."
+        },
+        "walkthrough.explanationFontSizePx": {
+          "type": "number",
+          "default": 14,
+          "minimum": 10,
+          "description": "Font size in pixels for explanation text in the explanation panel."
+        },
+        "walkthrough.libraryLocation": {
+          "type": "string",
+          "default": ".walkthroughs",
+          "description": "Workspace-relative folder used to discover walkthrough YAML files."
+        }
+      }
+    },
     "keybindings": [
       {
         "command": "walkthrough.next",

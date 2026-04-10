@@ -36,7 +36,7 @@ steps:
     range:
       start: 58
       end: 65
-    explanation: |
+    explanation:
       Fine-grained permissions are broken out into helpers so routes can ask
       for admin write access or incident write access without duplicating
-      role and scope checks.
+      role and scope checks.s

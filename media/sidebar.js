@@ -74,10 +74,9 @@
     if (state.mode === "playback" && state.playback) {
       stack.appendChild(renderPlayback(state));
     } else if (state.mode === "error" && state.error) {
-      stack.appendChild(renderBrowse(state.walkthroughs));
-      stack.appendChild(renderError(state.error));
+      stack.appendChild(renderErrorView(state.error));
     } else {
-      stack.appendChild(renderBrowse(state.walkthroughs));
+      stack.appendChild(renderBrowse(state.walkthroughs, state.libraryLocation));
     }
 
     shell.appendChild(stack);
@@ -86,9 +85,9 @@
     restorePlaybackFocus(shell, state);
   }
 
-  function renderBrowse(walkthroughs) {
+  function renderBrowse(walkthroughs, libraryLocation) {
     const panel = element("section", { className: "panel" });
-    panel.appendChild(renderHeader("", "", "Library"));
+    panel.appendChild(renderBrowseHeader(libraryLocation));
 
     if (walkthroughs.length === 0) {
       panel.appendChild(
@@ -96,7 +95,7 @@
           element("div", { className: "section-title", textContent: "No walkthroughs found" }),
           element("div", {
             className: "body-copy muted",
-            textContent: "Add .walkthroughs/*.yaml under the workspace root to populate this list.",
+            textContent: `Add ${libraryLocation}/*.yaml under the workspace root to populate this list.`,
           }),
         ]),
       );
@@ -105,6 +104,36 @@
 
     const list = element("div", { className: "walkthrough-list" });
     walkthroughs.forEach((walkthrough) => {
+      const item = element("div", { className: "walkthrough-item" });
+      const actions = element("div", { className: "walkthrough-actions" });
+
+      const editButton = createWalkthroughActionButton({
+        iconClassName: "walkthrough-action-icon-edit",
+        label: "Edit",
+        onClick: () => {
+          vscode.postMessage({
+            type: "editWalkthrough",
+            relativePath: walkthrough.relativePath,
+          });
+        },
+      });
+
+      const deleteButton = createWalkthroughActionButton({
+        buttonClassName: "is-danger",
+        iconClassName: "walkthrough-action-icon-delete",
+        label: "Delete",
+        onClick: () => {
+          vscode.postMessage({
+            type: "deleteWalkthrough",
+            relativePath: walkthrough.relativePath,
+          });
+        },
+      });
+
+      actions.appendChild(editButton);
+      actions.appendChild(deleteButton);
+      item.appendChild(actions);
+
       const button = element("button", {
         className: "walkthrough-button",
         type: "button",
@@ -115,21 +144,62 @@
           relativePath: walkthrough.relativePath,
         });
       });
-      const title = element("div", { className: "item-title", textContent: walkthrough.title });
+      const title = element("div", {
+        className: walkthrough.error ? "item-title item-title-broken" : "item-title",
+        textContent: walkthrough.title,
+      });
       const description = element("div", {
-        className: "body-copy muted",
-        textContent: walkthrough.description || "Open this walkthrough to step through the flow.",
+        className: walkthrough.error ? "body-copy item-copy-broken" : "body-copy muted",
+        textContent: walkthrough.error?.title || walkthrough.description || "Open this walkthrough to step through the flow.",
       });
       button.appendChild(title);
       button.appendChild(description);
-      list.appendChild(button);
+
+      item.appendChild(button);
+      list.appendChild(item);
     });
     panel.appendChild(list);
     return panel;
   }
 
+  function renderBrowseHeader(libraryLocation) {
+    const wrapper = element("div", { className: "header-copy" });
+    const eyebrow = element("div", { className: "eyebrow browse-eyebrow" });
+    eyebrow.appendChild(
+      element("span", {
+        className: "browse-eyebrow-label",
+        textContent: "CODEWALK LIBRARY",
+      }),
+    );
+    eyebrow.appendChild(
+      element("span", {
+        className: "browse-eyebrow-path",
+        textContent: libraryLocation.startsWith("/") ? libraryLocation : `/${libraryLocation}`,
+      }),
+    );
+    wrapper.appendChild(eyebrow);
+    return wrapper;
+  }
+
+  function createWalkthroughActionButton({ buttonClassName = "", iconClassName, label, onClick }) {
+    const button = element("button", {
+      className: ["walkthrough-action-button", buttonClassName].filter(Boolean).join(" "),
+      type: "button",
+    });
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+    button.appendChild(
+      element("span", {
+        className: `walkthrough-action-icon ${iconClassName}`,
+        ariaHidden: "true",
+      }),
+    );
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
   function renderPlayback(state) {
-    const { walkthrough, currentStepIndex } = state.playback;
+    const { walkthrough, currentStepIndex, explanationPanelVisible } = state.playback;
     const currentStep = walkthrough.steps[currentStepIndex];
     const isLastStep = currentStepIndex === walkthrough.steps.length - 1;
     const panel = element("section", { className: "panel" });
@@ -143,9 +213,28 @@
       textContent: "Back",
     });
     closeButton.addEventListener("click", () => vscode.postMessage({ type: "exit" }));
+    const panelToggleButton = element("button", {
+      className: explanationPanelVisible ? "icon-button is-panel-toggle is-toggled" : "icon-button is-panel-toggle",
+      dataFocusId: "playback-panel-toggle",
+      type: "button",
+      ariaLabel: explanationPanelVisible ? "Hide side panel" : "Show side panel",
+    });
+    panelToggleButton.appendChild(
+      element("span", {
+        className: "panel-toggle-icon",
+        ariaHidden: "true",
+      }),
+    );
+    panelToggleButton.appendChild(
+      element("span", {
+        textContent: "Side Panel",
+      }),
+    );
+    panelToggleButton.addEventListener("click", () => vscode.postMessage({ type: "toggleExplanationPanel" }));
 
     const headerCopy = element("div", { className: "header-copy" });
     topbarRow.appendChild(closeButton);
+    topbarRow.appendChild(panelToggleButton);
     headerCopy.appendChild(element("div", { className: "display-title", textContent: walkthrough.title }));
     if (walkthrough.description) {
       headerCopy.appendChild(
@@ -185,11 +274,25 @@
     });
     panel.appendChild(stepList);
 
-    const explanationCard = box("explanation-block", [
-      element("div", { className: "section-title", textContent: currentStep.title }),
-      renderMarkdown(currentStep.explanation),
-    ]);
-    panel.appendChild(explanationCard);
+    if (explanationPanelVisible) {
+      panel.appendChild(
+        box("summary-block", [
+          element("div", { className: "section-label", textContent: "Explanation Panel" }),
+          element("div", { className: "section-title", textContent: currentStep.title }),
+          element("div", { className: "item-meta", textContent: currentStep.file }),
+          element("div", {
+            className: "body-copy muted",
+            textContent: `Lines ${currentStep.range.start}-${currentStep.range.end} · Panel visible beside editor`,
+          }),
+        ]),
+      );
+    } else {
+      const explanationCard = box("explanation-block", [
+        element("div", { className: "section-title", textContent: currentStep.title }),
+        renderMarkdown(currentStep.explanation),
+      ]);
+      panel.appendChild(explanationCard);
+    }
 
     const footer = element("div", { className: "footer" });
     const previousButton = element("button", {
@@ -256,7 +359,7 @@
       return;
     }
 
-    const focusId = lastPlaybackFocusId ?? "playback-next";
+    const focusId = lastPlaybackFocusId ?? "playback-panel-toggle";
     const target =
       root.querySelector(`[data-focus-id="${focusId}"]`) ??
       root.querySelector('[data-focus-id="playback-next"]') ??
@@ -298,13 +401,37 @@
 
   function renderError(error) {
     return box("error", [
-      element("div", { className: "section-label", textContent: "Error" }),
+      element("div", { className: "section-label error-label", textContent: "Error" }),
       element("div", { className: "section-title", textContent: error.title }),
       error.fileName
         ? element("div", { className: "item-meta", textContent: error.fileName })
         : null,
       element("div", { className: "body-copy", textContent: error.detail }),
     ]);
+  }
+
+  function renderErrorView(error) {
+    const panel = element("section", { className: "panel" });
+    const topbar = element("div", { className: "playback-topbar" });
+    const topbarRow = element("div", { className: "playback-topbar-row" });
+    const closeButton = element("button", {
+      className: "icon-button",
+      type: "button",
+      textContent: "Back",
+    });
+    closeButton.addEventListener("click", () => vscode.postMessage({ type: "exit" }));
+
+    topbarRow.appendChild(closeButton);
+    topbar.appendChild(topbarRow);
+    topbar.appendChild(
+      element("div", {
+        className: "display-title error-title",
+        textContent: error.fileName ?? "Walkthrough error",
+      }),
+    );
+    panel.appendChild(topbar);
+    panel.appendChild(renderError(error));
+    return panel;
   }
 
   function renderHeader(title, description, eyebrow) {
@@ -476,6 +603,9 @@
     }
     if (options.type) {
       node.type = options.type;
+    }
+    if (options.ariaHidden !== undefined) {
+      node.setAttribute("aria-hidden", options.ariaHidden);
     }
     return node;
   }

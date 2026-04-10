@@ -199,8 +199,70 @@ steps:
       assert.match(result.error.detail, /only has 4 lines/);
     }
   });
+
+  it("discovers walkthroughs sorted by last updated date", async () => {
+    await writeWalkthrough(
+      workspaceRoot,
+      `
+title: Older
+steps:
+  - title: Intro
+    file: src.ts
+    range:
+      start: 1
+      end: 1
+    explanation: ok
+`,
+      "older.yaml",
+    );
+    await writeWalkthrough(
+      workspaceRoot,
+      `
+title: Newer
+steps:
+  - title: Intro
+    file: src.ts
+    range:
+      start: 1
+      end: 1
+    explanation: ok
+`,
+      "newer.yaml",
+    );
+
+    const olderPath = path.join(workspaceRoot, ".walkthroughs", "older.yaml");
+    const newerPath = path.join(workspaceRoot, ".walkthroughs", "newer.yaml");
+    const now = Date.now();
+    await fs.utimes(olderPath, now / 1000, (now - 60_000) / 1000);
+    await fs.utimes(newerPath, now / 1000, now / 1000);
+
+    const loader = new WalkthroughLoader(workspaceRoot);
+    const walkthroughs = await loader.discoverWalkthroughs();
+
+    assert.deepEqual(
+      walkthroughs.map((walkthrough) => walkthrough.fileName),
+      ["newer.yaml", "older.yaml"],
+    );
+    assert.match(String(walkthroughs[0]?.updatedAt), /^\d/);
+  });
+
+  it("marks malformed YAML as broken during discovery", async () => {
+    await writeWalkthrough(workspaceRoot, "title: demo:\nsteps: []\n", "malformed-YAML.yaml");
+
+    const loader = new WalkthroughLoader(workspaceRoot);
+    const walkthroughs = await loader.discoverWalkthroughs();
+    const malformed = walkthroughs.find((walkthrough) => walkthrough.fileName === "malformed-YAML.yaml");
+
+    assert.ok(malformed);
+    assert.equal(malformed.title, "malformed-YAML");
+    assert.match(malformed.error?.title ?? "", /Invalid YAML/);
+  });
 });
 
-async function writeWalkthrough(workspaceRoot: string, contents: string): Promise<void> {
-  await fs.writeFile(path.join(workspaceRoot, ".walkthroughs", "demo.yaml"), contents.trimStart());
+async function writeWalkthrough(
+  workspaceRoot: string,
+  contents: string,
+  fileName = "demo.yaml",
+): Promise<void> {
+  await fs.writeFile(path.join(workspaceRoot, ".walkthroughs", fileName), contents.trimStart());
 }

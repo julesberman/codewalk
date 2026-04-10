@@ -22,6 +22,8 @@ export interface WalkthroughSummary {
   relativePath: string;
   title: string;
   description?: string;
+  updatedAt: number;
+  error?: WalkthroughErrorState;
 }
 
 export interface WalkthroughFile extends WalkthroughSummary {
@@ -39,6 +41,7 @@ export interface WalkthroughErrorState {
 export interface PlaybackState {
   walkthrough: ValidatedWalkthrough;
   currentStepIndex: number;
+  explanationPanelVisible: boolean;
 }
 
 export interface RangeLineInfo {
