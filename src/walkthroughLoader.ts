@@ -25,6 +25,10 @@ type ValidationResult =
   | { ok: true; walkthrough: ValidatedWalkthrough }
   | { ok: false; error: WalkthroughErrorState };
 
+type DocumentValidationResult =
+  | { ok: true; document: WalkthroughDocument }
+  | { ok: false; error: WalkthroughErrorState };
+
 export class WalkthroughLoader {
   public constructor(private readonly workspaceRoot: string) {}
 
@@ -47,75 +51,7 @@ export class WalkthroughLoader {
     const candidates = entries.filter((entry) => entry.endsWith(".yaml") || entry.endsWith(".yml"));
 
     const summaries = await Promise.all(
-      candidates.map(async (fileName) => {
-        const absolutePath = path.join(walkthroughDir, fileName);
-        const relativePath = path.posix.join(libraryLocation, fileName);
-        const fallbackTitle = stripExtension(fileName);
-        const stats = await fs.stat(absolutePath);
-        const updatedAt = stats.mtimeMs;
-        const baseSummary = {
-          id: relativePath,
-          fileName,
-          relativePath,
-          title: fallbackTitle,
-          updatedAt,
-        };
-
-        try {
-          const raw = await fs.readFile(absolutePath, "utf8");
-          let parsed: unknown;
-
-          try {
-            parsed = yaml.load(raw);
-          } catch (error) {
-            return {
-              ...baseSummary,
-              error: {
-                title: "Invalid YAML",
-                detail: formatYamlError(error),
-                fileName,
-              },
-            };
-          }
-
-          if (!validateSchema(parsed)) {
-            return {
-              ...baseSummary,
-              error: {
-                title: "Schema validation failed",
-                detail: formatSchemaErrors(validateSchema.errors ?? []),
-                fileName,
-              },
-            };
-          }
-
-          const semanticError = await this.validateSemantics(parsed);
-          if (semanticError) {
-            return {
-              ...baseSummary,
-              error: {
-                title: "Walkthrough validation failed",
-                detail: semanticError,
-                fileName,
-              },
-            };
-          }
-
-          if (isRecord(parsed)) {
-            const title = getNonEmptyString(parsed.title) ?? fallbackTitle;
-            const description = getNonEmptyString(parsed.description);
-            return {
-              ...baseSummary,
-              title,
-              description,
-            };
-          }
-        } catch {
-          // Unreadable files should still appear in browse mode.
-        }
-
-        return baseSummary;
-      }),
+      candidates.map((fileName) => this.discoverWalkthroughSummary(fileName, libraryLocation, walkthroughDir)),
     );
 
     return summaries.sort(
@@ -134,51 +70,22 @@ export class WalkthroughLoader {
       if (nodeError.code === "ENOENT") {
         return {
           ok: false,
-          error: {
-            title: "Walkthrough file not found",
-            detail: `The file \`${relativePath}\` no longer exists.`,
-            fileName: walkthroughFile.fileName,
-          },
+          error: createError(
+            walkthroughFile.fileName,
+            "Walkthrough file not found",
+            `The file \`${relativePath}\` no longer exists.`,
+          ),
         };
       }
 
       throw error;
     }
 
-    let parsed: unknown;
-    try {
-      parsed = yaml.load(raw);
-    } catch (error) {
+    const result = await this.parseDocument(raw, walkthroughFile.fileName);
+    if (!result.ok) {
       return {
         ok: false,
-        error: {
-          title: "Invalid YAML",
-          detail: formatYamlError(error),
-          fileName: walkthroughFile.fileName,
-        },
-      };
-    }
-
-    if (!validateSchema(parsed)) {
-      return {
-        ok: false,
-        error: {
-          title: "Schema validation failed",
-          detail: formatSchemaErrors(validateSchema.errors ?? []),
-          fileName: walkthroughFile.fileName,
-        },
-      };
-    }
-
-    const semanticError = await this.validateSemantics(parsed);
-    if (semanticError) {
-      return {
-        ok: false,
-        error: {
-          title: "Walkthrough validation failed",
-          detail: semanticError,
-          fileName: walkthroughFile.fileName,
-        },
+        error: result.error,
       };
     }
 
@@ -186,8 +93,85 @@ export class WalkthroughLoader {
       ok: true,
       walkthrough: {
         ...walkthroughFile,
-        ...parsed,
+        ...result.document,
       },
+    };
+  }
+
+  private async discoverWalkthroughSummary(
+    fileName: string,
+    libraryLocation: string,
+    walkthroughDir: string,
+  ): Promise<WalkthroughSummary> {
+    const absolutePath = path.join(walkthroughDir, fileName);
+    const baseSummary = await this.createBaseSummary(fileName, libraryLocation, absolutePath);
+
+    try {
+      const raw = await fs.readFile(absolutePath, "utf8");
+      const result = await this.parseDocument(raw, fileName);
+      if (!result.ok) {
+        return {
+          ...baseSummary,
+          error: result.error,
+        };
+      }
+
+      return {
+        ...baseSummary,
+        title: result.document.title.trim() || baseSummary.title,
+        description: getNonEmptyString(result.document.description),
+      };
+    } catch {
+      // Unreadable files should still appear in browse mode.
+      return baseSummary;
+    }
+  }
+
+  private async createBaseSummary(
+    fileName: string,
+    libraryLocation: string,
+    absolutePath: string,
+  ): Promise<WalkthroughSummary> {
+    const relativePath = path.posix.join(libraryLocation, fileName);
+    const stats = await fs.stat(absolutePath);
+    return {
+      id: relativePath,
+      fileName,
+      relativePath,
+      title: stripExtension(fileName),
+      updatedAt: stats.mtimeMs,
+    };
+  }
+
+  private async parseDocument(raw: string, fileName: string): Promise<DocumentValidationResult> {
+    let parsed: unknown;
+    try {
+      parsed = yaml.load(raw);
+    } catch (error) {
+      return {
+        ok: false,
+        error: createError(fileName, "Invalid YAML", formatYamlError(error)),
+      };
+    }
+
+    if (!validateSchema(parsed)) {
+      return {
+        ok: false,
+        error: createError(fileName, "Schema validation failed", formatSchemaErrors(validateSchema.errors ?? [])),
+      };
+    }
+
+    const semanticError = await this.validateSemantics(parsed);
+    if (semanticError) {
+      return {
+        ok: false,
+        error: createError(fileName, "Walkthrough validation failed", semanticError),
+      };
+    }
+
+    return {
+      ok: true,
+      document: parsed,
     };
   }
 
@@ -259,16 +243,20 @@ function stripExtension(fileName: string): string {
   return fileName.replace(/\.(yaml|yml)$/i, "");
 }
 
+function createError(fileName: string, title: string, detail: string): WalkthroughErrorState {
+  return {
+    title,
+    detail,
+    fileName,
+  };
+}
+
 function countLines(contents: string): number {
   if (contents.length === 0) {
     return 1;
   }
 
   return contents.split(/\r?\n/).length;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getNonEmptyString(value: unknown): string | undefined {

@@ -43,7 +43,3 @@ export interface PlaybackState {
   currentStepIndex: number;
   explanationPanelVisible: boolean;
 }
-
-export interface RangeLineInfo {
-  lineCount: number;
-}

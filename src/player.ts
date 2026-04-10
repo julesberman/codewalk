@@ -8,6 +8,7 @@ import {
 } from "./config";
 import { DecorationsManager } from "./decorations";
 import {
+  type WalkthroughStep,
   type PlaybackState,
   type ValidatedWalkthrough,
 } from "./types";
@@ -36,49 +37,44 @@ export class WalkthroughPlayer implements vscode.Disposable {
       currentStepIndex: 0,
       explanationPanelVisible: getExplanationPanelOpenByDefault(),
     };
-    await this.revealCurrentStep();
+    await this.revealStepAtIndex(0);
   }
 
   public async next(): Promise<void> {
-    if (!this.activeState) {
+    const state = this.activeState;
+    if (!state) {
       return;
     }
 
-    const nextIndex = this.activeState.currentStepIndex + 1;
-    if (nextIndex >= this.activeState.walkthrough.steps.length) {
+    const nextIndex = state.currentStepIndex + 1;
+    if (nextIndex >= state.walkthrough.steps.length) {
       this.stop();
       return;
     }
 
-    this.activeState.currentStepIndex = nextIndex;
-    await this.revealCurrentStep();
+    await this.revealStepAtIndex(nextIndex);
   }
 
   public async previous(): Promise<void> {
-    if (!this.activeState) {
+    const state = this.activeState;
+    if (!state) {
       return;
     }
 
-    const previousIndex = this.activeState.currentStepIndex - 1;
+    const previousIndex = state.currentStepIndex - 1;
     if (previousIndex < 0) {
       return;
     }
 
-    this.activeState.currentStepIndex = previousIndex;
-    await this.revealCurrentStep();
+    await this.revealStepAtIndex(previousIndex);
   }
 
   public async jumpToStep(index: number): Promise<void> {
-    if (!this.activeState) {
+    if (!this.canRevealIndex(index)) {
       return;
     }
 
-    if (index < 0 || index >= this.activeState.walkthrough.steps.length) {
-      return;
-    }
-
-    this.activeState.currentStepIndex = index;
-    await this.revealCurrentStep();
+    await this.revealStepAtIndex(index);
   }
 
   public async toggleExplanationPanel(): Promise<void> {
@@ -99,11 +95,12 @@ export class WalkthroughPlayer implements vscode.Disposable {
   }
 
   public async restoreDecorationsForVisibleEditor(editor: vscode.TextEditor | undefined): Promise<void> {
-    if (!editor || !this.activeState) {
+    const state = this.activeState;
+    if (!editor || !state) {
       return;
     }
 
-    const step = this.activeState.walkthrough.steps[this.activeState.currentStepIndex];
+    const step = this.getCurrentStep(state);
     if (!this.decorations.matchesEditor(editor, this.workspaceRoot, step)) {
       this.decorations.clear();
       return;
@@ -124,12 +121,13 @@ export class WalkthroughPlayer implements vscode.Disposable {
   }
 
   public async refreshPresentation(): Promise<void> {
-    if (!this.activeState) {
+    const state = this.activeState;
+    if (!state) {
       return;
     }
 
     this.decorations.refreshStyles();
-    const step = this.activeState.walkthrough.steps[this.activeState.currentStepIndex];
+    const step = this.getCurrentStep(state);
     const editor = vscode.window.visibleTextEditors.find((candidate) =>
       this.decorations.matchesEditor(candidate, this.workspaceRoot, step),
     );
@@ -138,15 +136,34 @@ export class WalkthroughPlayer implements vscode.Disposable {
       this.decorations.apply(editor, step);
     }
 
-    this.observer.onPlaybackStateChanged(this.activeState);
+    this.notify();
   }
 
-  private async revealCurrentStep(): Promise<void> {
-    if (!this.activeState) {
+  private canRevealIndex(index: number): boolean {
+    return this.activeState !== null && index >= 0 && index < this.activeState.walkthrough.steps.length;
+  }
+
+  private getCurrentStep(state: PlaybackState): WalkthroughStep {
+    return state.walkthrough.steps[state.currentStepIndex];
+  }
+
+  private notify(): void {
+    if (this.activeState) {
+      this.observer.onPlaybackStateChanged(this.activeState);
+    }
+  }
+
+  private async revealStepAtIndex(index: number): Promise<void> {
+    const state = this.activeState;
+    if (!state || index < 0 || index >= state.walkthrough.steps.length) {
       return;
     }
 
-    const step = this.activeState.walkthrough.steps[this.activeState.currentStepIndex];
+    state.currentStepIndex = index;
+    await this.revealStep(state, this.getCurrentStep(state));
+  }
+
+  private async revealStep(state: PlaybackState, step: WalkthroughStep): Promise<void> {
     const fileUri = vscode.Uri.file(path.join(this.workspaceRoot, step.file));
     const document = await vscode.workspace.openTextDocument(fileUri);
     const editor = await vscode.window.showTextDocument(document, {
@@ -167,6 +184,6 @@ export class WalkthroughPlayer implements vscode.Disposable {
     editor.revealRange(revealRange, vscode.TextEditorRevealType.AtTop);
     this.decorations.apply(editor, step);
     editor.revealRange(targetRange, vscode.TextEditorRevealType.Default);
-    this.observer.onPlaybackStateChanged(this.activeState);
+    this.notify();
   }
 }

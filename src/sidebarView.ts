@@ -31,6 +31,16 @@ interface SidebarRenderState {
   libraryLocation: string;
 }
 
+type SidebarMessage =
+  | { type: "startWalkthrough"; relativePath: string }
+  | { type: "editWalkthrough"; relativePath: string }
+  | { type: "deleteWalkthrough"; relativePath: string }
+  | { type: "next" }
+  | { type: "previous" }
+  | { type: "jumpToStep"; index: number }
+  | { type: "toggleExplanationPanel" }
+  | { type: "exit" };
+
 export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "walkthrough.sidebar";
 
@@ -68,40 +78,20 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   }
 
   public showBrowse(walkthroughs: WalkthroughSummary[]): void {
-    this.renderState = {
-      mode: "browse",
-      walkthroughs,
-      playback: null,
-      error: null,
-      libraryLocation: getWalkLibraryLocation(),
-    };
-    this.postState();
+    this.show("browse", walkthroughs);
   }
 
   public showPlayback(walkthroughs: WalkthroughSummary[], playback: PlaybackState): void {
-    this.renderState = {
-      mode: "playback",
-      walkthroughs,
-      playback,
-      error: null,
-      libraryLocation: getWalkLibraryLocation(),
-    };
-    this.postState();
+    this.show("playback", walkthroughs, playback);
   }
 
   public showError(walkthroughs: WalkthroughSummary[], error: WalkthroughErrorState): void {
-    this.renderState = {
-      mode: "error",
-      walkthroughs,
-      playback: null,
-      error,
-      libraryLocation: getWalkLibraryLocation(),
-    };
-    this.postState();
+    this.show("error", walkthroughs, null, error);
   }
 
   private async getHtml(webview: vscode.Webview): Promise<string> {
     const mediaUri = vscode.Uri.joinPath(this.context.extensionUri, "media");
+    const markdownScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "markdown.js"));
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.js"));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.css"));
     const templatePath = path.join(this.context.extensionPath, "media", "sidebar.html");
@@ -110,6 +100,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
 
     return template
       .replaceAll("{{cspSource}}", webview.cspSource)
+      .replaceAll("{{markdownScriptUri}}", markdownScriptUri.toString())
       .replaceAll("{{styleUri}}", styleUri.toString())
       .replaceAll("{{scriptUri}}", scriptUri.toString())
       .replaceAll("{{nonce}}", nonce);
@@ -122,26 +113,37 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private show(
+    mode: SidebarMode,
+    walkthroughs: WalkthroughSummary[],
+    playback: PlaybackState | null = null,
+    error: WalkthroughErrorState | null = null,
+  ): void {
+    this.renderState = {
+      mode,
+      walkthroughs,
+      playback,
+      error,
+      libraryLocation: getWalkLibraryLocation(),
+    };
+    this.postState();
+  }
+
   private async handleMessage(message: unknown): Promise<void> {
-    if (!isRecord(message) || typeof message.type !== "string") {
+    const sidebarMessage = parseSidebarMessage(message);
+    if (!sidebarMessage) {
       return;
     }
 
-    switch (message.type) {
+    switch (sidebarMessage.type) {
       case "startWalkthrough":
-        if (typeof message.relativePath === "string") {
-          await this.controller.startWalkthrough(message.relativePath);
-        }
+        await this.controller.startWalkthrough(sidebarMessage.relativePath);
         return;
       case "editWalkthrough":
-        if (typeof message.relativePath === "string") {
-          await this.controller.editWalkthrough(message.relativePath);
-        }
+        await this.controller.editWalkthrough(sidebarMessage.relativePath);
         return;
       case "deleteWalkthrough":
-        if (typeof message.relativePath === "string") {
-          await this.controller.deleteWalkthrough(message.relativePath);
-        }
+        await this.controller.deleteWalkthrough(sidebarMessage.relativePath);
         return;
       case "next":
         await this.controller.next();
@@ -150,9 +152,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         await this.controller.previous();
         return;
       case "jumpToStep":
-        if (typeof message.index === "number") {
-          await this.controller.jumpToStep(message.index);
-        }
+        await this.controller.jumpToStep(sidebarMessage.index);
         return;
       case "toggleExplanationPanel":
         await this.controller.toggleExplanationPanel();
@@ -163,6 +163,28 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       default:
         return;
     }
+  }
+}
+
+function parseSidebarMessage(message: unknown): SidebarMessage | null {
+  if (!isRecord(message) || typeof message.type !== "string") {
+    return null;
+  }
+
+  switch (message.type) {
+    case "startWalkthrough":
+    case "editWalkthrough":
+    case "deleteWalkthrough":
+      return typeof message.relativePath === "string" ? message as SidebarMessage : null;
+    case "jumpToStep":
+      return typeof message.index === "number" ? message as SidebarMessage : null;
+    case "next":
+    case "previous":
+    case "toggleExplanationPanel":
+    case "exit":
+      return message as SidebarMessage;
+    default:
+      return null;
   }
 }
 

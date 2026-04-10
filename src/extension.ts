@@ -96,47 +96,25 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
   public onPlaybackStateChanged(state: PlaybackState | null): void {
     if (state) {
       this.currentError = null;
-      this.syncExplanationPanel(state);
-      this.sidebar.showPlayback(this.walkthroughs, state);
-      return;
     }
 
-    this.explanationPanel.hide();
-    if (this.currentError) {
-      this.sidebar.showError(this.walkthroughs, this.currentError);
-      return;
-    }
-
-    this.sidebar.showBrowse(this.walkthroughs);
+    this.render(state);
   }
 
   private async refreshBrowseState(): Promise<void> {
     this.walkthroughs = await this.loader.discoverWalkthroughs();
-    const playback = this.player.getState();
-
-    if (playback) {
-      this.sidebar.showPlayback(this.walkthroughs, playback);
-      return;
-    }
-
-    if (this.currentError) {
-      this.sidebar.showError(this.walkthroughs, this.currentError);
-      return;
-    }
-
-    this.sidebar.showBrowse(this.walkthroughs);
+    this.render();
   }
 
   private async startWalkthrough(relativePath: string): Promise<void> {
     const result = await this.loader.loadWalkthrough(relativePath);
     if (!result.ok) {
-      this.player.stop();
       this.currentError = result.error;
-      this.sidebar.showError(this.walkthroughs, result.error);
+      this.player.stop();
       return;
     }
 
-    this.currentError = null;
+    this.clearError();
     await this.player.start(result.walkthrough);
   }
 
@@ -185,7 +163,7 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
 
     const playback = this.player.getState();
     if (playback?.walkthrough.relativePath === relativePath) {
-      this.currentError = null;
+      this.clearError();
       this.player.stop();
     }
 
@@ -193,38 +171,57 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
   }
 
   private async next(): Promise<void> {
-    this.currentError = null;
+    this.clearError();
     await this.player.next();
   }
 
   private async previous(): Promise<void> {
-    this.currentError = null;
+    this.clearError();
     await this.player.previous();
   }
 
   private async jumpToStep(index: number): Promise<void> {
-    this.currentError = null;
+    this.clearError();
     await this.player.jumpToStep(index);
   }
 
   private async toggleExplanationPanel(): Promise<void> {
-    this.currentError = null;
+    this.clearError();
     await this.player.toggleExplanationPanel();
   }
 
   private async exit(): Promise<void> {
-    this.currentError = null;
+    this.clearError();
     this.player.stop();
     await this.refreshBrowseState();
+  }
+
+  private clearError(): void {
+    this.currentError = null;
+  }
+
+  private render(playback: PlaybackState | null = this.player.getState()): void {
+    if (playback) {
+      this.syncExplanationPanel(playback);
+      this.sidebar.showPlayback(this.walkthroughs, playback);
+      return;
+    }
+
+    this.explanationPanel.hide();
+    if (this.currentError) {
+      this.sidebar.showError(this.walkthroughs, this.currentError);
+      return;
+    }
+
+    this.sidebar.showBrowse(this.walkthroughs);
   }
 
   private syncExplanationPanel(state: PlaybackState): void {
     if (state.explanationPanelVisible) {
       this.explanationPanel.show(state);
-      return;
+    } else {
+      this.explanationPanel.hide();
     }
-
-    this.explanationPanel.hide();
   }
 
   private resolveWalkthroughUri(relativePath: string): vscode.Uri | null {

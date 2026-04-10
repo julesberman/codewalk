@@ -11,13 +11,7 @@ export class DecorationsManager implements vscode.Disposable {
 
   public apply(editor: vscode.TextEditor, step: WalkthroughStep): void {
     this.clear();
-
-    const targetRange = new vscode.Range(
-      new vscode.Position(step.range.start - 1, 0),
-      new vscode.Position(step.range.end - 1, Number.MAX_SAFE_INTEGER),
-    );
-
-    editor.setDecorations(this.activeDecoration, [targetRange]);
+    editor.setDecorations(this.activeDecoration, [toWholeLineRange(step)]);
     editor.setDecorations(this.inactiveDecoration, buildInactiveRanges(editor.document, step));
   }
 
@@ -81,4 +75,11 @@ function buildInactiveRanges(
   }
 
   return inactiveRanges;
+}
+
+function toWholeLineRange(step: WalkthroughStep): vscode.Range {
+  return new vscode.Range(
+    new vscode.Position(step.range.start - 1, 0),
+    new vscode.Position(step.range.end - 1, Number.MAX_SAFE_INTEGER),
+  );
 }

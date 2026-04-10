@@ -257,6 +257,35 @@ steps:
     assert.equal(malformed.title, "malformed-YAML");
     assert.match(malformed.error?.title ?? "", /Invalid YAML/);
   });
+
+  it("uses the same validation pipeline for discovery and explicit load", async () => {
+    await writeWalkthrough(
+      workspaceRoot,
+      `
+title: Demo
+steps:
+  - title: Intro
+    file: missing.ts
+    range:
+      start: 1
+      end: 1
+    explanation: ok
+`,
+      "broken.yaml",
+    );
+
+    const loader = new WalkthroughLoader(workspaceRoot);
+    const walkthroughs = await loader.discoverWalkthroughs();
+    const discovered = walkthroughs.find((walkthrough) => walkthrough.fileName === "broken.yaml");
+    const loaded = await loader.loadWalkthrough(".walkthroughs/broken.yaml");
+
+    assert.ok(discovered?.error);
+    assert.equal(loaded.ok, false);
+    if (discovered?.error && !loaded.ok) {
+      assert.equal(discovered.error.title, loaded.error.title);
+      assert.equal(discovered.error.detail, loaded.error.detail);
+    }
+  });
 });
 
 async function writeWalkthrough(

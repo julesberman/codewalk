@@ -7,6 +7,10 @@
   let activeState = null;
   let lastPlaybackFocusId = null;
 
+  function postMessage(type, payload = {}) {
+    vscode.postMessage({ type, ...payload });
+  }
+
   window.addEventListener("message", (event) => {
     const message = event.data;
     if (!message || message.type !== "renderState") {
@@ -42,21 +46,21 @@
     if (!event.metaKey && !event.ctrlKey && !event.altKey) {
       if (event.key === "Escape") {
         event.preventDefault();
-        vscode.postMessage({ type: "exit" });
+        postMessage("exit");
         return;
       }
 
       if (event.key === "]") {
         event.preventDefault();
         if (activeState.playback.currentStepIndex < activeState.playback.walkthrough.steps.length - 1) {
-          vscode.postMessage({ type: "next" });
+          postMessage("next");
         }
         return;
       }
 
       if (event.key === "[") {
         event.preventDefault();
-        vscode.postMessage({ type: "previous" });
+        postMessage("previous");
         return;
       }
     }
@@ -110,24 +114,14 @@
       const editButton = createWalkthroughActionButton({
         iconClassName: "walkthrough-action-icon-edit",
         label: "Edit",
-        onClick: () => {
-          vscode.postMessage({
-            type: "editWalkthrough",
-            relativePath: walkthrough.relativePath,
-          });
-        },
+        onClick: () => postMessage("editWalkthrough", { relativePath: walkthrough.relativePath }),
       });
 
       const deleteButton = createWalkthroughActionButton({
         buttonClassName: "is-danger",
         iconClassName: "walkthrough-action-icon-delete",
         label: "Delete",
-        onClick: () => {
-          vscode.postMessage({
-            type: "deleteWalkthrough",
-            relativePath: walkthrough.relativePath,
-          });
-        },
+        onClick: () => postMessage("deleteWalkthrough", { relativePath: walkthrough.relativePath }),
       });
 
       actions.appendChild(editButton);
@@ -138,12 +132,7 @@
         className: "walkthrough-button",
         type: "button",
       });
-      button.addEventListener("click", () => {
-        vscode.postMessage({
-          type: "startWalkthrough",
-          relativePath: walkthrough.relativePath,
-        });
-      });
+      button.addEventListener("click", () => postMessage("startWalkthrough", { relativePath: walkthrough.relativePath }));
       const title = element("div", {
         className: walkthrough.error ? "item-title item-title-broken" : "item-title",
         textContent: walkthrough.title,
@@ -212,7 +201,7 @@
       type: "button",
       textContent: "Back",
     });
-    closeButton.addEventListener("click", () => vscode.postMessage({ type: "exit" }));
+    closeButton.addEventListener("click", () => postMessage("exit"));
     const panelToggleButton = element("button", {
       className: explanationPanelVisible ? "icon-button is-panel-toggle is-toggled" : "icon-button is-panel-toggle",
       dataFocusId: "playback-panel-toggle",
@@ -230,7 +219,7 @@
         textContent: "Side Panel",
       }),
     );
-    panelToggleButton.addEventListener("click", () => vscode.postMessage({ type: "toggleExplanationPanel" }));
+    panelToggleButton.addEventListener("click", () => postMessage("toggleExplanationPanel"));
 
     const headerCopy = element("div", { className: "header-copy" });
     topbarRow.appendChild(closeButton);
@@ -257,7 +246,7 @@
         dataFocusId: `step-${index}`,
         type: "button",
       });
-      button.addEventListener("click", () => vscode.postMessage({ type: "jumpToStep", index }));
+      button.addEventListener("click", () => postMessage("jumpToStep", { index }));
       button.appendChild(
         element("span", {
           className: "step-index",
@@ -302,7 +291,7 @@
       textContent: "[ PREV",
     });
     previousButton.disabled = currentStepIndex === 0;
-    previousButton.addEventListener("click", () => vscode.postMessage({ type: "previous" }));
+    previousButton.addEventListener("click", () => postMessage("previous"));
     footer.appendChild(previousButton);
 
     footer.appendChild(
@@ -319,7 +308,7 @@
       textContent: "NEXT ]",
     });
     nextButton.disabled = isLastStep;
-    nextButton.addEventListener("click", () => vscode.postMessage({ type: "next" }));
+    nextButton.addEventListener("click", () => postMessage("next"));
     footer.appendChild(nextButton);
 
     panel.appendChild(footer);
@@ -419,7 +408,7 @@
       type: "button",
       textContent: "Back",
     });
-    closeButton.addEventListener("click", () => vscode.postMessage({ type: "exit" }));
+    closeButton.addEventListener("click", () => postMessage("exit"));
 
     topbarRow.appendChild(closeButton);
     topbar.appendChild(topbarRow);
@@ -434,151 +423,10 @@
     return panel;
   }
 
-  function renderHeader(title, description, eyebrow) {
-    const wrapper = element("div", { className: "header-copy" });
-    if (eyebrow) {
-      wrapper.appendChild(element("div", { className: "eyebrow", textContent: eyebrow }));
-    }
-    if (title) {
-      wrapper.appendChild(element("div", { className: "display-title", textContent: title }));
-    }
-    if (description) {
-      wrapper.appendChild(element("div", { className: "body-copy muted", textContent: description }));
-    }
-    return wrapper;
-  }
-
-  function section(title, child) {
-    return box("section-block", [
-      element("div", { className: "section-label", textContent: title }),
-      child,
-    ]);
-  }
-
   function renderMarkdown(markdown) {
     const container = element("div", { className: "markdown" });
-    tokenizeMarkdown(markdown).forEach((block) => {
-      container.appendChild(block);
-    });
+    window.WalkthroughMarkdown?.renderInto(container, markdown);
     return container;
-  }
-
-  function tokenizeMarkdown(markdown) {
-    const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-    const blocks = [];
-    let paragraph = [];
-    let listItems = [];
-    let codeFence = null;
-
-    const flushParagraph = () => {
-      if (paragraph.length === 0) {
-        return;
-      }
-      blocks.push(element("p", { innerHTML: renderInline(paragraph.join(" ")) }));
-      paragraph = [];
-    };
-
-    const flushList = () => {
-      if (listItems.length === 0) {
-        return;
-      }
-      const list = element("ul");
-      listItems.forEach((item) => {
-        list.appendChild(element("li", { innerHTML: renderInline(item) }));
-      });
-      blocks.push(list);
-      listItems = [];
-    };
-
-    for (const line of lines) {
-      if (line.startsWith("```")) {
-        flushParagraph();
-        flushList();
-        if (codeFence !== null) {
-          blocks.push(renderCodeBlock(codeFence.join("\n")));
-          codeFence = null;
-        } else {
-          codeFence = [];
-        }
-        continue;
-      }
-
-      if (codeFence !== null) {
-        codeFence.push(line);
-        continue;
-      }
-
-      const headingMatch = /^(#{1,4})\s+(.*)$/.exec(line);
-      if (headingMatch) {
-        flushParagraph();
-        flushList();
-        const level = String(Math.min(headingMatch[1].length, 4));
-        blocks.push(element(`h${level}`, { innerHTML: renderInline(headingMatch[2]) }));
-        continue;
-      }
-
-      const listMatch = /^[-*]\s+(.*)$/.exec(line);
-      if (listMatch) {
-        flushParagraph();
-        listItems.push(listMatch[1]);
-        continue;
-      }
-
-      if (line.trim().length === 0) {
-        flushParagraph();
-        flushList();
-        continue;
-      }
-
-      paragraph.push(line.trim());
-    }
-
-    flushParagraph();
-    flushList();
-    if (codeFence !== null) {
-      blocks.push(renderCodeBlock(codeFence.join("\n")));
-    }
-
-    return blocks.length > 0 ? blocks : [element("p", { textContent: markdown })];
-  }
-
-  function renderCodeBlock(code) {
-    const pre = element("pre");
-    pre.appendChild(element("code", { textContent: code }));
-    return pre;
-  }
-
-  function renderInline(text) {
-    let output = escapeHtml(text);
-    output = output.replace(/`([^`]+)`/g, "<code>$1</code>");
-    output = output.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    output = output.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
-      const safeHref = sanitizeHref(href);
-      if (!safeHref) {
-        return label;
-      }
-
-      return `<a href="${safeHref}">${label}</a>`;
-    });
-    return output;
-  }
-
-  function sanitizeHref(href) {
-    if (/^(https?:|mailto:)/i.test(href)) {
-      return href;
-    }
-
-    return null;
-  }
-
-  function escapeHtml(text) {
-    return text
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
   }
 
   function box(className, children) {
