@@ -19,6 +19,7 @@
     ]
   },
   "include": [
+    "scripts/**/*.ts",
     "src/**/*.ts",
     "test/**/*.ts",
     "walkthrough.schema.json"

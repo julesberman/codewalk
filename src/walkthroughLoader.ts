@@ -1,32 +1,17 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
-import * as yaml from "js-yaml";
-
-import schema from "../walkthrough.schema.json";
 import { getWalkLibraryLocation, toAbsoluteLibraryPath } from "./config";
 import {
   type ValidatedWalkthrough,
-  type WalkthroughDocument,
   type WalkthroughErrorState,
   type WalkthroughFile,
   type WalkthroughSummary,
 } from "./types";
-
-const ajv = new Ajv2020({
-  allErrors: true,
-  strict: false,
-});
-
-const validateSchema = ajv.compile<WalkthroughDocument>(schema);
+import { type DocumentValidationResult, parseWalkthroughDocument } from "./walkthroughValidation";
 
 type ValidationResult =
   | { ok: true; walkthrough: ValidatedWalkthrough }
-  | { ok: false; error: WalkthroughErrorState };
-
-type DocumentValidationResult =
-  | { ok: true; document: WalkthroughDocument }
   | { ok: false; error: WalkthroughErrorState };
 
 export class WalkthroughLoader {
@@ -144,85 +129,7 @@ export class WalkthroughLoader {
   }
 
   private async parseDocument(raw: string, fileName: string): Promise<DocumentValidationResult> {
-    let parsed: unknown;
-    try {
-      parsed = yaml.load(raw);
-    } catch (error) {
-      return {
-        ok: false,
-        error: createError(fileName, "Invalid YAML", formatYamlError(error)),
-      };
-    }
-
-    if (!validateSchema(parsed)) {
-      return {
-        ok: false,
-        error: createError(fileName, "Schema validation failed", formatSchemaErrors(validateSchema.errors ?? [])),
-      };
-    }
-
-    const semanticError = await this.validateSemantics(parsed);
-    if (semanticError) {
-      return {
-        ok: false,
-        error: createError(fileName, "Walkthrough validation failed", semanticError),
-      };
-    }
-
-    return {
-      ok: true,
-      document: parsed,
-    };
-  }
-
-  private async validateSemantics(document: WalkthroughDocument): Promise<string | null> {
-    const title = document.title.trim();
-    if (title.length === 0) {
-      return "The walkthrough title must not be empty or whitespace only.";
-    }
-
-    if (document.description !== undefined && document.description.trim().length === 0) {
-      return "The walkthrough description must not be empty or whitespace only.";
-    }
-
-    for (const [index, step] of document.steps.entries()) {
-      if (step.title.trim().length === 0) {
-        return `Step ${index + 1} title must not be empty or whitespace only.`;
-      }
-
-      if (step.explanation.trim().length === 0) {
-        return `Step ${index + 1} explanation must not be empty or whitespace only.`;
-      }
-
-      if (step.range.start < 1 || step.range.end < 1) {
-        return `Step ${index + 1} range values must be at least 1.`;
-      }
-
-      if (step.range.end < step.range.start) {
-        return `Step ${index + 1} range end must be greater than or equal to range start.`;
-      }
-
-      const absoluteFilePath = path.join(this.workspaceRoot, step.file);
-
-      let fileContents: string;
-      try {
-        fileContents = await fs.readFile(absoluteFilePath, "utf8");
-      } catch (error) {
-        const nodeError = error as NodeJS.ErrnoException;
-        if (nodeError.code === "ENOENT") {
-          return `Step ${index + 1} references \`${step.file}\`, but that file does not exist.`;
-        }
-
-        throw error;
-      }
-
-      const lineCount = countLines(fileContents);
-      if (step.range.end > lineCount) {
-        return `Step ${index + 1} references lines ${step.range.start}-${step.range.end} in \`${step.file}\`, but the file only has ${lineCount} lines.`;
-      }
-    }
-
-    return null;
+    return parseWalkthroughDocument(raw, fileName, this.workspaceRoot);
   }
 
   private toWalkthroughFile(relativePath: string): WalkthroughFile {
@@ -251,35 +158,6 @@ function createError(fileName: string, title: string, detail: string): Walkthrou
   };
 }
 
-function countLines(contents: string): number {
-  if (contents.length === 0) {
-    return 1;
-  }
-
-  return contents.split(/\r?\n/).length;
-}
-
 function getNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
-}
-
-function formatSchemaErrors(errors: ErrorObject[]): string {
-  return errors
-    .map((error) => {
-      const location = error.instancePath.length > 0 ? error.instancePath : "document";
-      if (error.keyword === "additionalProperties" && error.params && "additionalProperty" in error.params) {
-        return `${location}: unexpected property \`${String(error.params.additionalProperty)}\`.`;
-      }
-
-      return `${location}: ${error.message ?? "validation failed"}.`;
-    })
-    .join(" ");
-}
-
-function formatYamlError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "The walkthrough file could not be parsed as YAML.";
 }

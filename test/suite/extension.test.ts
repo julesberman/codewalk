@@ -16,7 +16,7 @@ suite("Extension smoke", () => {
     assert.equal(added, true);
     await waitFor(() => (vscode.workspace.workspaceFolders?.length ?? 0) > 0);
 
-    const extension = vscode.extensions.getExtension("local.code-walkthrough");
+    const extension = vscode.extensions.all.find((candidate) => candidate.packageJSON.name === "code-walkthrough");
     assert.ok(extension, "Expected extension metadata");
     await extension?.activate();
 

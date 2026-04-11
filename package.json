@@ -2,8 +2,8 @@
   "name": "code-walkthrough",
   "displayName": "Code Walkthrough",
   "description": "Play YAML-authored code walkthroughs inside VS Code.",
-  "version": "0.0.1",
-  "publisher": "local",
+  "version": "0.1.0",
+  "publisher": "julesberman",
   "license": "MIT",
   "engines": {
     "vscode": "^1.95.0"
@@ -131,6 +131,9 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
+    "validate:walkthrough": "node ./out/scripts/validateWalkthrough.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --allow-missing-repository",
     "watch:tsc": "tsc -watch -p ./",
     "watch": "node ./scripts/watch-dev.mjs",
     "lint": "tsc -p ./ --noEmit",
@@ -143,6 +146,7 @@
     "@types/node": "^22.15.3",
     "@types/vscode": "^1.95.0",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
     "mocha": "^11.1.0",
     "typescript": "^5.8.3"
   },
