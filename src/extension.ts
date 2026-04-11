@@ -33,6 +33,7 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
       startWalkthrough: async (relativePath) => this.startWalkthrough(relativePath),
       editWalkthrough: async (relativePath) => this.editWalkthrough(relativePath),
       deleteWalkthrough: async (relativePath) => this.deleteWalkthrough(relativePath),
+      openSettings: async () => this.openSettings(),
       next: async () => this.next(),
       previous: async () => this.previous(),
       jumpToStep: async (index) => this.jumpToStep(index),
@@ -44,7 +45,11 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
       decorations,
       this.player,
       this.explanationPanel,
-      vscode.window.registerWebviewViewProvider(SidebarViewProvider.viewType, this.sidebar),
+      vscode.window.registerWebviewViewProvider(SidebarViewProvider.viewType, this.sidebar, {
+        webviewOptions: {
+          retainContextWhenHidden: true,
+        },
+      }),
       vscode.commands.registerCommand("walkthrough.start", async (relativePath?: string) => {
         if (typeof relativePath === "string") {
           await this.startWalkthrough(relativePath);
@@ -168,6 +173,10 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
     }
 
     await this.refreshBrowseState();
+  }
+
+  private async openSettings(): Promise<void> {
+    await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${this.context.extension.id}`);
   }
 
   private async next(): Promise<void> {

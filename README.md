@@ -104,7 +104,7 @@ Inside the Extension Development Host window:
 1. Open the folder `demo/` from this repo as the workspace.
 2. Click the Walkthrough icon in the Activity Bar.
 3. Start with `Auth flow overview`, `Request lifecycle`, `Project creation flow`, or `Incident response flow`.
-4. Use `Alt+]`, `Alt+[`, or the sidebar buttons to move through the steps.
+4. Use `]`, `[`, or the sidebar buttons to move through the steps.
 
 The demo workspace already contains:
 

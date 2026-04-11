@@ -11,6 +11,8 @@
     vscode.postMessage({ type, ...payload });
   }
 
+  postMessage("ready");
+
   window.addEventListener("message", (event) => {
     const message = event.data;
     if (!message || message.type !== "renderState") {
@@ -52,6 +54,7 @@
 
       if (event.key === "]") {
         event.preventDefault();
+        lastPlaybackFocusId = "playback-panel";
         if (activeState.playback.currentStepIndex < activeState.playback.walkthrough.steps.length - 1) {
           postMessage("next");
         }
@@ -60,6 +63,7 @@
 
       if (event.key === "[") {
         event.preventDefault();
+        lastPlaybackFocusId = "playback-panel";
         postMessage("previous");
         return;
       }
@@ -111,15 +115,15 @@
       const item = element("div", { className: "walkthrough-item" });
       const actions = element("div", { className: "walkthrough-actions" });
 
-      const editButton = createWalkthroughActionButton({
-        iconClassName: "walkthrough-action-icon-edit",
+      const editButton = createBrowseIconButton({
+        iconKey: "edit",
         label: "Edit",
         onClick: () => postMessage("editWalkthrough", { relativePath: walkthrough.relativePath }),
       });
 
-      const deleteButton = createWalkthroughActionButton({
+      const deleteButton = createBrowseIconButton({
         buttonClassName: "is-danger",
-        iconClassName: "walkthrough-action-icon-delete",
+        iconKey: "trash",
         label: "Delete",
         onClick: () => postMessage("deleteWalkthrough", { relativePath: walkthrough.relativePath }),
       });
@@ -153,6 +157,7 @@
 
   function renderBrowseHeader(libraryLocation) {
     const wrapper = element("div", { className: "header-copy" });
+    const topRow = element("div", { className: "browse-header-row" });
     const eyebrow = element("div", { className: "eyebrow browse-eyebrow" });
     eyebrow.appendChild(
       element("span", {
@@ -160,30 +165,46 @@
         textContent: "CODEWALK LIBRARY",
       }),
     );
-    eyebrow.appendChild(
-      element("span", {
+
+    const settingsButton = createBrowseIconButton({
+      iconKey: "settings",
+      label: "Settings",
+      onClick: () => postMessage("openSettings"),
+    });
+
+    topRow.appendChild(eyebrow);
+    topRow.appendChild(settingsButton);
+    wrapper.appendChild(topRow);
+    wrapper.appendChild(
+      element("div", {
         className: "browse-eyebrow-path",
         textContent: libraryLocation.startsWith("/") ? libraryLocation : `/${libraryLocation}`,
       }),
     );
-    wrapper.appendChild(eyebrow);
     return wrapper;
   }
 
-  function createWalkthroughActionButton({ buttonClassName = "", iconClassName, label, onClick }) {
+  function createBrowseIconButton({ buttonClassName = "", iconKey, label, onClick }) {
     const button = element("button", {
-      className: ["walkthrough-action-button", buttonClassName].filter(Boolean).join(" "),
+      className: ["browse-icon-button", buttonClassName].filter(Boolean).join(" "),
       type: "button",
     });
     button.setAttribute("aria-label", label);
-    button.setAttribute("title", label);
-    button.appendChild(
-      element("span", {
-        className: `walkthrough-action-icon ${iconClassName}`,
-        ariaHidden: "true",
-      }),
-    );
-    button.addEventListener("click", onClick);
+    applyTooltip(button, label);
+    const icon = element("span", {
+      className: "browse-icon-button-icon",
+      ariaHidden: "true",
+    });
+    const iconUri = activeState?.iconUris?.[iconKey];
+    if (iconUri) {
+      icon.style.setProperty("--icon-url", `url("${iconUri}")`);
+    }
+    button.appendChild(icon);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    });
     return button;
   }
 
@@ -191,7 +212,11 @@
     const { walkthrough, currentStepIndex, explanationPanelVisible } = state.playback;
     const currentStep = walkthrough.steps[currentStepIndex];
     const isLastStep = currentStepIndex === walkthrough.steps.length - 1;
-    const panel = element("section", { className: "panel" });
+    const panel = element("section", {
+      className: "panel",
+      dataFocusId: "playback-panel",
+      tabIndex: -1,
+    });
 
     const topbar = element("div", { className: "playback-topbar" });
     const topbarRow = element("div", { className: "playback-topbar-row" });
@@ -201,6 +226,7 @@
       type: "button",
       textContent: "Back",
     });
+    applyTooltip(closeButton, "Back");
     closeButton.addEventListener("click", () => postMessage("exit"));
     const panelToggleButton = element("button", {
       className: explanationPanelVisible ? "icon-button is-panel-toggle is-toggled" : "icon-button is-panel-toggle",
@@ -208,6 +234,7 @@
       type: "button",
       ariaLabel: explanationPanelVisible ? "Hide side panel" : "Show side panel",
     });
+    applyTooltip(panelToggleButton, explanationPanelVisible ? "Hide side panel" : "Show side panel");
     panelToggleButton.appendChild(
       element("span", {
         className: "panel-toggle-icon",
@@ -246,6 +273,7 @@
         dataFocusId: `step-${index}`,
         type: "button",
       });
+      applyTooltip(button, `Step ${index + 1}: ${step.title}`);
       button.addEventListener("click", () => postMessage("jumpToStep", { index }));
       button.appendChild(
         element("span", {
@@ -290,6 +318,7 @@
       type: "button",
       textContent: "[ PREV",
     });
+    applyTooltip(previousButton, "Previous step");
     previousButton.disabled = currentStepIndex === 0;
     previousButton.addEventListener("click", () => postMessage("previous"));
     footer.appendChild(previousButton);
@@ -307,6 +336,7 @@
       type: "button",
       textContent: "NEXT ]",
     });
+    applyTooltip(nextButton, "Next step");
     nextButton.disabled = isLastStep;
     nextButton.addEventListener("click", () => postMessage("next"));
     footer.appendChild(nextButton);
@@ -348,9 +378,9 @@
       return;
     }
 
-    const focusId = lastPlaybackFocusId ?? "playback-panel-toggle";
     const target =
-      root.querySelector(`[data-focus-id="${focusId}"]`) ??
+      (lastPlaybackFocusId ? root.querySelector(`[data-focus-id="${lastPlaybackFocusId}"]`) : null) ??
+      root.querySelector('[data-focus-id="playback-panel"]') ??
       root.querySelector('[data-focus-id="playback-next"]') ??
       root.querySelector(PLAYBACK_FOCUSABLE_SELECTOR);
     if (!(target instanceof HTMLElement)) {
@@ -408,6 +438,7 @@
       type: "button",
       textContent: "Back",
     });
+    applyTooltip(closeButton, "Back");
     closeButton.addEventListener("click", () => postMessage("exit"));
 
     topbarRow.appendChild(closeButton);
@@ -435,6 +466,10 @@
     return wrapper;
   }
 
+  function applyTooltip(node, label) {
+    node.setAttribute("data-tooltip", label);
+  }
+
   function element(tagName, options = {}) {
     const node = document.createElement(tagName);
     if (options.className) {
@@ -451,6 +486,9 @@
     }
     if (options.type) {
       node.type = options.type;
+    }
+    if (options.ariaLabel !== undefined) {
+      node.setAttribute("aria-label", options.ariaLabel);
     }
     if (options.ariaHidden !== undefined) {
       node.setAttribute("aria-hidden", options.ariaHidden);

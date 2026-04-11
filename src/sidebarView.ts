@@ -14,6 +14,7 @@ export interface SidebarController {
   startWalkthrough(relativePath: string): Promise<void>;
   editWalkthrough(relativePath: string): Promise<void>;
   deleteWalkthrough(relativePath: string): Promise<void>;
+  openSettings(): Promise<void>;
   next(): Promise<void>;
   previous(): Promise<void>;
   jumpToStep(index: number): Promise<void>;
@@ -29,12 +30,21 @@ interface SidebarRenderState {
   playback: PlaybackState | null;
   error: WalkthroughErrorState | null;
   libraryLocation: string;
+  iconUris: SidebarIconUris;
+}
+
+interface SidebarIconUris {
+  settings: string;
+  edit: string;
+  trash: string;
 }
 
 type SidebarMessage =
+  | { type: "ready" }
   | { type: "startWalkthrough"; relativePath: string }
   | { type: "editWalkthrough"; relativePath: string }
   | { type: "deleteWalkthrough"; relativePath: string }
+  | { type: "openSettings" }
   | { type: "next" }
   | { type: "previous" }
   | { type: "jumpToStep"; index: number }
@@ -45,12 +55,18 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "walkthrough.sidebar";
 
   private webviewView: vscode.WebviewView | undefined;
+  private iconUris: SidebarIconUris | null = null;
   private renderState: SidebarRenderState = {
     mode: "browse",
     walkthroughs: [],
     playback: null,
     error: null,
     libraryLocation: getWalkLibraryLocation(),
+    iconUris: {
+      settings: "",
+      edit: "",
+      trash: "",
+    },
   };
 
   public constructor(
@@ -68,12 +84,32 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media")],
     };
+    this.iconUris = {
+      settings: webviewView.webview
+        .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "icons", "settings.svg"))
+        .toString(),
+      edit: webviewView.webview
+        .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "icons", "edit.svg"))
+        .toString(),
+      trash: webviewView.webview
+        .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "icons", "trash.svg"))
+        .toString(),
+    };
+    this.renderState = {
+      ...this.renderState,
+      iconUris: this.iconUris,
+    };
 
-    webviewView.webview.html = await this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((message: unknown) => {
       void this.handleMessage(message);
     });
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.postState();
+      }
+    });
 
+    webviewView.webview.html = await this.getHtml(webviewView.webview);
     this.postState();
   }
 
@@ -125,6 +161,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       playback,
       error,
       libraryLocation: getWalkLibraryLocation(),
+      iconUris:
+        this.iconUris ??
+        this.renderState.iconUris,
     };
     this.postState();
   }
@@ -136,6 +175,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     }
 
     switch (sidebarMessage.type) {
+      case "ready":
+        this.postState();
+        return;
       case "startWalkthrough":
         await this.controller.startWalkthrough(sidebarMessage.relativePath);
         return;
@@ -144,6 +186,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         return;
       case "deleteWalkthrough":
         await this.controller.deleteWalkthrough(sidebarMessage.relativePath);
+        return;
+      case "openSettings":
+        await this.controller.openSettings();
         return;
       case "next":
         await this.controller.next();
@@ -172,12 +217,15 @@ function parseSidebarMessage(message: unknown): SidebarMessage | null {
   }
 
   switch (message.type) {
+    case "ready":
+      return message as SidebarMessage;
     case "startWalkthrough":
     case "editWalkthrough":
     case "deleteWalkthrough":
       return typeof message.relativePath === "string" ? message as SidebarMessage : null;
     case "jumpToStep":
       return typeof message.index === "number" ? message as SidebarMessage : null;
+    case "openSettings":
     case "next":
     case "previous":
     case "toggleExplanationPanel":
