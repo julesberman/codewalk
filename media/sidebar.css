@@ -1,19 +1,3 @@
-:root {
-  color-scheme: light dark;
-  --ui-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --ui-sans: var(--vscode-font-family);
-  --ui-mono: var(--vscode-editor-font-family);
-  --sidebar-explanation-font-size: 1.02rem;
-  --page-pad-inline: 0px;
-  --page-pad-block: 20px;
-  --column-width: 100%;
-  --rule-color: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
-  --surface-color: color-mix(in srgb, var(--vscode-editor-background) 42%, transparent);
-  --muted-color: color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-sideBar-background));
-  --active-color: color-mix(in srgb, var(--vscode-focusBorder) 60%, var(--vscode-foreground));
-  --hover-color: color-mix(in srgb, var(--vscode-list-hoverBackground) 75%, transparent);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -24,10 +8,10 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--ui-sans);
-  font-size: 13px;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body);
   line-height: 1.5;
-  color: var(--vscode-foreground);
+  color: var(--color-text);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--vscode-sideBar-background) 92%, var(--vscode-editor-background)) 0%, var(--vscode-sideBar-background) 24%, var(--vscode-sideBar-background) 100%);
 }
@@ -50,11 +34,11 @@ a:hover {
 }
 
 #app {
-  padding: var(--page-pad-block) var(--page-pad-inline) 32px;
+  padding: var(--layout-page-padding-block) var(--layout-page-padding-inline) 32px;
 }
 
 .shell {
-  max-width: var(--column-width);
+  max-width: var(--layout-content-max-width);
 }
 
 .stack,
@@ -91,7 +75,7 @@ a:hover {
 
 .walkthrough-list,
 .step-list {
-  border-top: 1px solid var(--rule-color);
+  border-top: 1px solid var(--color-rule);
 }
 
 .walkthrough-list {
@@ -141,12 +125,12 @@ a:focus-visible {
   bottom: calc(100% + 6px);
   z-index: 20;
   padding: 3px 6px;
-  border: 1px solid var(--rule-color);
+  border: 1px solid var(--color-rule);
   border-radius: 4px;
   background: color-mix(in srgb, var(--vscode-editor-background) 96%, black);
-  color: var(--vscode-foreground);
-  font-family: var(--ui-sans);
-  font-size: 11px;
+  color: var(--color-text);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-meta);
   line-height: 1.2;
   white-space: nowrap;
   pointer-events: none;
@@ -169,8 +153,8 @@ a:focus-visible {
 .item-meta,
 .counter,
 .step-index {
-  font-family: var(--ui-mono);
-  font-size: 11px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-meta);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -181,7 +165,7 @@ a:focus-visible {
 .counter,
 .muted,
 .step-index {
-  color: var(--muted-color);
+  color: var(--color-text-muted);
 }
 
 .browse-eyebrow {
@@ -200,7 +184,7 @@ a:focus-visible {
 .browse-eyebrow-label {
   flex: 0 0 auto;
   font-size: 1.16em;
-  color: var(--vscode-textLink-foreground, var(--active-color));
+  color: var(--vscode-textLink-foreground, var(--color-active));
 }
 
 .browse-eyebrow-path {
@@ -209,15 +193,15 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: -2px;
-  font-family: var(--ui-mono);
+  font-family: var(--font-family-mono);
   font-size: 0.95em;
   letter-spacing: 0.02em;
   font-style: italic;
   text-transform: lowercase;
-  color: var(--muted-color);
+  color: var(--color-text-muted);
   text-decoration: underline;
   text-decoration-style: dotted;
-  text-decoration-color: color-mix(in srgb, var(--muted-color) 70%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
   text-underline-offset: 0.18em;
 }
 
@@ -229,7 +213,7 @@ a:focus-visible {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--rule-color);
+  border: 1px solid var(--color-rule);
   border-radius: 6px;
   transition:
     background-color 120ms ease,
@@ -241,12 +225,12 @@ a:focus-visible {
 .browse-icon-button:hover,
 .browse-icon-button:focus-visible {
   border-color: var(--vscode-focusBorder);
-  background: var(--hover-color);
+  background: var(--color-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 32%, transparent);
 }
 
 .browse-icon-button.is-danger {
-  color: var(--vscode-errorForeground);
+  color: var(--color-error);
 }
 
 .browse-icon-button-icon {
@@ -267,22 +251,22 @@ a:focus-visible {
 .display-title,
 .section-title {
   margin: 0;
-  font-family: var(--ui-serif);
+  font-family: var(--font-family-title);
   font-weight: 500;
   letter-spacing: -0.01em;
   line-height: 1.15;
 }
 
 .display-title {
-  font-size: clamp(1.75rem, 1.55rem + 0.8vw, 2.25rem);
+  font-size: var(--font-size-title);
 }
 
 .error-title {
-  color: var(--vscode-errorForeground);
+  color: var(--color-error);
 }
 
 .section-title {
-  font-size: 1.35rem;
+  font-size: var(--font-size-section-title);
   max-width: 22ch;
 }
 
@@ -295,7 +279,7 @@ a:focus-visible {
   gap: 10px;
   position: relative;
   padding: 14px 0 15px;
-  border-bottom: 1px solid var(--rule-color);
+  border-bottom: 1px solid var(--color-rule);
 }
 
 .walkthrough-button {
@@ -320,21 +304,21 @@ a:focus-visible {
 .step-button:hover,
 .icon-button:hover,
 .footer-button:enabled:hover {
-  background: var(--hover-color);
+  background: var(--color-hover);
 }
 
 .item-title {
-  font-family: var(--ui-serif);
+  font-family: var(--font-family-title);
   font-size: 1.08rem;
   line-height: 1.25;
 }
 
 .item-title-broken {
-  color: var(--vscode-errorForeground);
+  color: var(--color-error);
 }
 
 .item-copy-broken {
-  color: var(--vscode-errorForeground);
+  color: var(--color-error);
 }
 
 .playback-topbar {
@@ -360,8 +344,8 @@ a:focus-visible {
   justify-self: start;
   padding-block: 2px;
   min-height: 24px;
-  font-family: var(--ui-mono);
-  font-size: 11px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-meta);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -399,7 +383,7 @@ a:focus-visible {
 }
 
 .is-panel-toggle.is-toggled {
-  color: color-mix(in srgb, var(--active-color) 88%, var(--vscode-foreground));
+  color: color-mix(in srgb, var(--color-active) 88%, var(--color-text));
 }
 
 .is-panel-toggle.is-toggled .panel-toggle-icon::before {
@@ -419,21 +403,21 @@ a:focus-visible {
   width: 100%;
   padding: 11px 0 12px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--rule-color);
+  border-bottom: 1px solid var(--color-rule);
   border-left: 1px solid transparent;
 }
 
 .step-button.is-active {
-  border-left-color: var(--active-color);
+  border-left-color: var(--color-active);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--active-color) 24%, transparent), transparent 76%),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-active) 24%, transparent), transparent 76%),
     color-mix(in srgb, var(--vscode-list-activeSelectionBackground, var(--vscode-focusBorder)) 32%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--active-color) 88%, white 12%);
-  color: var(--vscode-foreground);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-active) 88%, white 12%);
+  color: var(--color-text);
 }
 
 .step-button.is-active .step-index {
-  color: color-mix(in srgb, var(--active-color) 88%, var(--vscode-foreground));
+  color: color-mix(in srgb, var(--color-active) 88%, var(--color-text));
 }
 
 .step-title {
@@ -449,7 +433,7 @@ a:focus-visible {
 .markdown {
   gap: 12px;
   max-width: 64ch;
-  font-size: var(--sidebar-explanation-font-size);
+  font-size: var(--font-size-sidebar-explanation);
   line-height: 1.65;
 }
 
@@ -473,7 +457,7 @@ a:focus-visible {
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  font-family: var(--ui-serif);
+  font-family: var(--font-family-title);
   font-weight: 500;
   line-height: 1.2;
 }
@@ -488,17 +472,17 @@ a:focus-visible {
 }
 
 .markdown code {
-  font-family: var(--ui-mono);
+  font-family: var(--font-family-mono);
   font-size: 0.93em;
   padding: 0.08rem 0.22rem;
-  background: var(--surface-color);
+  background: var(--color-surface);
 }
 
 .markdown pre {
   overflow: auto;
   padding: 12px 14px;
-  background: var(--surface-color);
-  border: 1px solid var(--rule-color);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
 }
 
 .markdown pre code {
@@ -512,13 +496,13 @@ a:focus-visible {
   gap: 12px;
   align-items: center;
   padding-top: 18px;
-  border-top: 1px solid var(--rule-color);
+  border-top: 1px solid var(--color-rule);
 }
 
 .footer-button {
   padding: 0;
-  font-family: var(--ui-mono);
-  font-size: 11px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-meta);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -535,11 +519,11 @@ a:focus-visible {
 .empty,
 .error {
   padding: 14px 0 0;
-  border-top: 1px solid var(--rule-color);
+  border-top: 1px solid var(--color-rule);
 }
 
 .error-label {
-  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, var(--vscode-foreground)));
+  color: var(--vscode-inputValidation-errorForeground, var(--color-error, var(--color-text)));
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import { getExplanationFontSizePx } from "./config";
 import { type PlaybackState } from "./types";
+import { getSharedUiTokenCss } from "./uiTokens";
 
 export class ExplanationPanelManager implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -73,6 +74,9 @@ export class ExplanationPanelManager implements vscode.Disposable {
     const step = playback.walkthrough.steps[playback.currentStepIndex];
     const nonce = createNonce();
     const serializedExplanation = serializeForScript(step.explanation);
+    const sharedTokenCss = getSharedUiTokenCss({
+      panelExplanationSizePx: getExplanationFontSizePx(),
+    });
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -83,8 +87,8 @@ export class ExplanationPanelManager implements vscode.Disposable {
       content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style nonce="${nonce}">${sharedTokenCss}</style>
     <link nonce="${nonce}" rel="stylesheet" href="${styleUri.toString()}" />
-    <style nonce="${nonce}">:root { --panel-explanation-font-size: ${getExplanationFontSizePx()}px; }</style>
     <title>Explanation</title>
   </head>
   <body>

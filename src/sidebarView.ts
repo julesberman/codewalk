@@ -9,6 +9,7 @@ import {
   type WalkthroughErrorState,
   type WalkthroughSummary,
 } from "./types";
+import { getSharedUiTokenCss } from "./uiTokens";
 
 export interface SidebarController {
   startWalkthrough(relativePath: string): Promise<void>;
@@ -133,12 +134,14 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const templatePath = path.join(this.context.extensionPath, "media", "sidebar.html");
     const template = await fs.readFile(templatePath, "utf8");
     const nonce = createNonce();
+    const sharedTokenCss = getSharedUiTokenCss();
 
     return template
       .replaceAll("{{cspSource}}", webview.cspSource)
       .replaceAll("{{markdownScriptUri}}", markdownScriptUri.toString())
       .replaceAll("{{styleUri}}", styleUri.toString())
       .replaceAll("{{scriptUri}}", scriptUri.toString())
+      .replaceAll("{{sharedTokenCss}}", sharedTokenCss)
       .replaceAll("{{nonce}}", nonce);
   }
 
