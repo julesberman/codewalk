@@ -10,6 +10,9 @@ dist/
 build/
 *.tsbuildinfo
 
+.claude/
+.walkthroughs/
+
 # Coverage and test artifacts
 coverage/
 .nyc_output/

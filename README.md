@@ -123,7 +123,7 @@ The installer:
 - downloads the latest hosted `.vsix`
 - installs it with the VS Code `code` CLI
 - optionally installs the `codewalk-yaml-contract` skill file
-- offers common Codex and Claude Code skill locations, plus a custom path
+- offers common Codex and Claude Code skill directories, plus a custom path
 
 Prerequisites:
 
