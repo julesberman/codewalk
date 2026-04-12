@@ -48,3 +48,4 @@ TEST-results.xml
 
 # Extension packaging artifacts
 *.vsix
+!downloads/code-walkthrough.vsix

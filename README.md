@@ -108,21 +108,71 @@ If you only want a typecheck-style pass:
 npm run lint
 ```
 
-## Package For Release
+## Install From GitHub
 
-Build a `.vsix` package with:
+This extension is currently distributed directly as a `.vsix` file from GitHub. Marketplace publishing is intentionally deferred.
+
+Quick install on macOS or Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/julesberman/codewalk/main/scripts/install-extension.sh | bash
+```
+
+The installer:
+
+- downloads the latest hosted `.vsix`
+- installs it with the VS Code `code` CLI
+- optionally installs the `codewalk-yaml-contract` skill file
+- offers common Codex and Claude Code skill locations, plus a custom path
+
+Prerequisites:
+
+- `bash`
+- `curl`
+- the VS Code `code` CLI on your `PATH`
+
+If you do not have the `code` CLI available, install the extension manually:
+
+1. Download [downloads/code-walkthrough.vsix](downloads/code-walkthrough.vsix).
+2. In VS Code, open the Command Palette.
+3. Run `Extensions: Install from VSIX...`
+4. Select the downloaded `.vsix` file.
+
+You can also install from a local clone:
+
+```bash
+bash scripts/install-extension.sh
+```
+
+## Build And Refresh The Hosted `.vsix`
+
+Maintain the GitHub installer by updating the tracked `.vsix` in `downloads/code-walkthrough.vsix`.
+
+Build and validate a fresh package with:
 
 ```bash
 npm install
-npm run package
-```
-
-Before publishing, validate the release manually:
-
-```bash
 npm run lint
 npm test
-npm run package
+npm run package:vsix
 ```
 
-Then install the generated `.vsix` into a clean VS Code profile and verify that the sidebar appears and walkthrough playback works.
+Then refresh the hosted installer artifact:
+
+```bash
+cp ./code-walkthrough-<version>.vsix ./downloads/code-walkthrough.vsix
+```
+
+Before pushing, verify the generated local package and the tracked hosted package:
+
+```bash
+ls -1 ./*.vsix ./downloads/code-walkthrough.vsix
+```
+
+The GitHub installer script always fetches:
+
+```text
+https://raw.githubusercontent.com/julesberman/codewalk/main/downloads/code-walkthrough.vsix
+```
+
+If you bump the extension version, build a new `.vsix`, replace `downloads/code-walkthrough.vsix`, and push both the source changes and the refreshed hosted package together.
