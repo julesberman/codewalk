@@ -9,6 +9,7 @@ export async function run(): Promise<void> {
   });
 
   mocha.addFile(path.resolve(__dirname, "loader.test.js"));
+  mocha.addFile(path.resolve(__dirname, "uiTokens.test.js"));
   mocha.addFile(path.resolve(__dirname, "validator.test.js"));
   mocha.addFile(path.resolve(__dirname, "extension.test.js"));
 

@@ -175,12 +175,13 @@
     topRow.appendChild(eyebrow);
     topRow.appendChild(settingsButton);
     wrapper.appendChild(topRow);
-    wrapper.appendChild(
-      element("div", {
-        className: "browse-eyebrow-path",
-        textContent: libraryLocation.startsWith("/") ? libraryLocation : `/${libraryLocation}`,
-      }),
-    );
+    const pathButton = element("button", {
+      className: "browse-path-button",
+      type: "button",
+      textContent: libraryLocation.startsWith("/") ? libraryLocation : `/${libraryLocation}`,
+    });
+    pathButton.addEventListener("click", () => postMessage("openSettings"));
+    wrapper.appendChild(pathButton);
     return wrapper;
   }
 

@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { WalkthroughLoader } from "../../src/walkthroughLoader";
+import { WalkthroughLoader } from "../../walkthroughLoader";
 
 describe("WalkthroughLoader", () => {
   let workspaceRoot: string;

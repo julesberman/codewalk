@@ -4,7 +4,7 @@ import * as path from "node:path";
 import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
 import * as yaml from "js-yaml";
 
-import schema from "../walkthrough.schema.json";
+import schema from "./walkthrough.schema.json";
 import { type WalkthroughDocument, type WalkthroughErrorState } from "./types";
 
 const ajv = new Ajv2020({

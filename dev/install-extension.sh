@@ -6,12 +6,17 @@ REPO="${CODEWALK_GITHUB_REPO:-codewalk}"
 REF="${1:-${CODEWALK_GITHUB_REF:-main}}"
 RAW_BASE_URL="${CODEWALK_RAW_BASE_URL:-https://raw.githubusercontent.com/${OWNER}/${REPO}/${REF}}"
 VSIX_URL="${CODEWALK_VSIX_URL:-${RAW_BASE_URL}/downloads/code-walkthrough.vsix}"
-SKILL_URL="${CODEWALK_SKILL_URL:-${RAW_BASE_URL}/codewalk-yaml-contract/SKILL.md}"
+SKILL_URL="${CODEWALK_SKILL_URL:-${RAW_BASE_URL}/dev/codewalk-yaml-contract/SKILL.md}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LOCAL_VSIX_PATH="${REPO_ROOT}/downloads/code-walkthrough.vsix"
 TMP_DIR="$(mktemp -d)"
 VSIX_PATH="${TMP_DIR}/code-walkthrough.vsix"
 SKILL_TMP_PATH="${TMP_DIR}/codewalk-yaml-contract-SKILL.md"
 TTY_PATH="/dev/tty"
 SKILL_NAME="codewalk-yaml-contract"
+EXTENSION_PUBLISHER="julesberman"
+EXTENSION_NAME="code-walkthrough"
 COLOR_RESET=""
 COLOR_BOLD=""
 COLOR_DIM=""
@@ -88,6 +93,13 @@ require_command() {
   fi
 }
 
+archive_contains() {
+  local archive_path="$1"
+  local entry_path="$2"
+
+  zipinfo -1 "${archive_path}" | grep -Fqx "${entry_path}"
+}
+
 read_from_tty() {
   local variable_name="$1"
   local value
@@ -156,6 +168,63 @@ download_file() {
   print_step "Downloading ${url}"
   if ! curl --fail --location --silent --show-error "${url}" --output "${output_path}"; then
     fail "Download failed: ${url}"
+  fi
+}
+
+prepare_vsix() {
+  if [ -f "${LOCAL_VSIX_PATH}" ] && [ -z "${CODEWALK_VSIX_URL:-}" ]; then
+    print_step "Using local VSIX ${LOCAL_VSIX_PATH}"
+    cp "${LOCAL_VSIX_PATH}" "${VSIX_PATH}"
+    return 0
+  fi
+
+  download_file "${VSIX_URL}" "${VSIX_PATH}"
+}
+
+verify_vsix() {
+  local archive_path="$1"
+
+  print_step "Validating VSIX contents"
+
+  if ! archive_contains "${archive_path}" "extension/out/src/extension.js"; then
+    fail "VSIX is missing extension/out/src/extension.js."
+  fi
+
+  if ! archive_contains "${archive_path}" "extension/node_modules/ajv/dist/2020.js"; then
+    fail "VSIX is missing runtime dependency ajv/dist/2020.js."
+  fi
+
+  if ! archive_contains "${archive_path}" "extension/node_modules/js-yaml/index.js"; then
+    fail "VSIX is missing runtime dependency js-yaml/index.js."
+  fi
+}
+
+find_installed_extension_dir() {
+  local extensions_dir="${HOME}/.vscode/extensions"
+
+  find "${extensions_dir}" -maxdepth 1 -type d -name "${EXTENSION_PUBLISHER}.${EXTENSION_NAME}-*" | sort | tail -n 1
+}
+
+verify_installed_extension() {
+  local installed_dir
+
+  print_step "Verifying installed extension files"
+  installed_dir="$(find_installed_extension_dir)"
+
+  if [ -z "${installed_dir}" ]; then
+    fail "VS Code did not extract ${EXTENSION_PUBLISHER}.${EXTENSION_NAME} into ${HOME}/.vscode/extensions."
+  fi
+
+  if [ ! -f "${installed_dir}/out/src/extension.js" ]; then
+    fail "Installed extension is missing out/src/extension.js."
+  fi
+
+  if [ ! -f "${installed_dir}/node_modules/ajv/dist/2020.js" ]; then
+    fail "Installed extension is missing node_modules/ajv/dist/2020.js."
+  fi
+
+  if [ ! -f "${installed_dir}/node_modules/js-yaml/index.js" ]; then
+    fail "Installed extension is missing node_modules/js-yaml/index.js."
   fi
 }
 
@@ -262,6 +331,7 @@ esac
 
 require_command "bash"
 require_command "curl"
+require_command "zipinfo"
 
 if ! confirm "Install the Code Walkthrough VS Code extension now?" "y"; then
   print_warning "Extension install cancelled."
@@ -269,13 +339,19 @@ if ! confirm "Install the Code Walkthrough VS Code extension now?" "y"; then
 fi
 
 require_command "code"
-download_file "${VSIX_URL}" "${VSIX_PATH}"
+prepare_vsix
+verify_vsix "${VSIX_PATH}"
 
 print_step "Installing VS Code extension"
 code --install-extension "${VSIX_PATH}"
-print_success "Installed Code Walkthrough from ${VSIX_URL}"
+verify_installed_extension
+if [ -f "${LOCAL_VSIX_PATH}" ] && [ -z "${CODEWALK_VSIX_URL:-}" ]; then
+  print_success "Installed Code Walkthrough from local file ${LOCAL_VSIX_PATH}"
+else
+  print_success "Installed Code Walkthrough from ${VSIX_URL}"
+fi
 
-if confirm "Also install the optional codewalk-yaml-contract/SKILL.md file?" "y"; then
+if confirm "Also install the optional dev/codewalk-yaml-contract/SKILL.md file?" "y"; then
   download_file "${SKILL_URL}" "${SKILL_TMP_PATH}"
   SKILL_DESTINATION="$(choose_skill_destination)"
   install_skill "${SKILL_DESTINATION}"
@@ -287,5 +363,7 @@ echo ""
 print_divider
 printf '%b\n' "${COLOR_GREEN}${COLOR_BOLD}Done.${COLOR_RESET}"
 print_info "Extension installed in VS Code."
+print_info "If VS Code was already open, run 'Developer: Reload Window' before opening the CodeWalk sidebar."
+print_info "A reload badge on Extensions or a sidebar that stays on a loading bar usually means the window has not reloaded yet."
 print_info "If the skill was installed, restart your coding tool if it does not pick it up immediately."
 print_divider

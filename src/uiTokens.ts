@@ -1,3 +1,5 @@
+import { type UiTypographyPreset } from "./config";
+
 interface SharedUiTokenSections {
   fonts: Record<string, string>;
   fontSizes: Record<string, string>;
@@ -7,6 +9,8 @@ interface SharedUiTokenSections {
 
 export interface SharedUiTokenOptions {
   panelExplanationSizePx?: number;
+  monaspaceNeonFontUri?: string;
+  typographyPreset?: UiTypographyPreset;
 }
 
 export const sharedUiTokens = {
@@ -59,6 +63,7 @@ export const sharedUiTokens = {
 } satisfies SharedUiTokenSections;
 
 export function getSharedUiTokenCss(options: SharedUiTokenOptions = {}): string {
+  const typographyPreset = options.typographyPreset ?? "monaspaceNeon";
   const fontSizes = {
     ...sharedUiTokens.fontSizes,
     panelExplanationSize:
@@ -66,14 +71,16 @@ export function getSharedUiTokenCss(options: SharedUiTokenOptions = {}): string 
         ? `${options.panelExplanationSizePx}px`
         : sharedUiTokens.fontSizes.panelExplanationSize,
   };
+  const activeFonts = getActiveFonts(typographyPreset);
 
   const lines = [
+    ...getFontFaceCss(options.monaspaceNeonFontUri),
     ":root {",
     "  color-scheme: light dark;",
     ...toCssVariables({
-      "font-family-title": sharedUiTokens.fonts.titleFamily,
-      "font-family-body": sharedUiTokens.fonts.bodyFamily,
-      "font-family-mono": sharedUiTokens.fonts.monoFamily,
+      "font-family-title": activeFonts.titleFamily,
+      "font-family-body": activeFonts.bodyFamily,
+      "font-family-mono": activeFonts.monoFamily,
       "font-size-body": fontSizes.bodySize,
       "font-size-meta": fontSizes.metaSize,
       "font-size-title": fontSizes.titleSize,
@@ -100,6 +107,37 @@ export function getSharedUiTokenCss(options: SharedUiTokenOptions = {}): string 
 
 function toCssVariables(values: Record<string, string>): string[] {
   return Object.entries(values).map(([name, value]) => `  --${name}: ${value};`);
+}
+
+function getActiveFonts(typographyPreset: UiTypographyPreset): Record<string, string> {
+  if (typographyPreset === "system") {
+    return sharedUiTokens.fonts;
+  }
+
+  const fallbackStack = sharedUiTokens.fonts;
+  const monaspaceStack = '"Monaspace Neon Var", "Monaspace Neon", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+  return {
+    titleFamily: `${monaspaceStack}, ${fallbackStack.titleFamily}`,
+    bodyFamily: `${monaspaceStack}, ${fallbackStack.bodyFamily}`,
+    monoFamily: `${monaspaceStack}, ${fallbackStack.monoFamily}`,
+  };
+}
+
+function getFontFaceCss(fontUri: string | undefined): string[] {
+  if (!fontUri) {
+    return [];
+  }
+
+  return [
+    "@font-face {",
+    '  font-family: "Monaspace Neon Var";',
+    `  src: url("${fontUri}") format("woff2");`,
+    "  font-style: normal;",
+    "  font-weight: 100 800;",
+    "  font-display: swap;",
+    "}",
+  ];
 }
 
 function getSidebarMutedTextColor(): string {

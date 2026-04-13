@@ -19,10 +19,8 @@
     ]
   },
   "include": [
-    "scripts/**/*.ts",
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "walkthrough.schema.json"
+    "dev/**/*.ts",
+    "src/**/*.ts"
   ],
   "exclude": [
     "out",

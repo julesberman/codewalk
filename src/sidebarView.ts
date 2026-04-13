@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getWalkLibraryLocation } from "./config";
+import { getUiTypographyPreset, getWalkLibraryLocation } from "./config";
 import {
   type PlaybackState,
   type WalkthroughErrorState,
@@ -131,10 +131,16 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const markdownScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "markdown.js"));
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.js"));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.css"));
+    const monaspaceNeonFontUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(mediaUri, "fonts", "Monaspace Neon Var.woff2"),
+    );
     const templatePath = path.join(this.context.extensionPath, "media", "sidebar.html");
     const template = await fs.readFile(templatePath, "utf8");
     const nonce = createNonce();
-    const sharedTokenCss = getSharedUiTokenCss();
+    const sharedTokenCss = getSharedUiTokenCss({
+      monaspaceNeonFontUri: monaspaceNeonFontUri.toString(),
+      typographyPreset: getUiTypographyPreset(),
+    });
 
     return template
       .replaceAll("{{cspSource}}", webview.cspSource)

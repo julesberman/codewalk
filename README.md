@@ -15,7 +15,7 @@ The extension discovers `.yaml` and `.yml` files in the workspace-root `.walkthr
 
 ## Author A Walkthrough With An Agent
 
-Use the skill at `codewalk-yaml-contract/SKILL.md` as the authoring contract. That skill is the source of truth for:
+Use the skill at `dev/codewalk-yaml-contract/SKILL.md` as the authoring contract. That skill is the source of truth for:
 
 - the allowed YAML shape
 - required fields
@@ -94,7 +94,9 @@ npm install
 npm run watch
 ```
 
-That compiles the extension, watches for changes, and opens VS Code on the bundled `demo/` workspace with this extension loaded for development.
+That compiles the extension, watches for changes, and opens VS Code on the bundled `dev/demo/` workspace with this extension loaded for development.
+
+This repo does not rely on checked-in `.vscode/` workspace settings. Use the npm scripts directly instead of VS Code task or launch configs.
 
 If you only want to compile once:
 
@@ -115,13 +117,17 @@ This extension is currently distributed directly as a `.vsix` file from GitHub. 
 Quick install on macOS or Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/julesberman/codewalk/main/scripts/install-extension.sh | bash
+curl -fsSL https://raw.githubusercontent.com/julesberman/codewalk/main/dev/install-extension.sh | bash
 ```
+
+If VS Code is already open when the install finishes, run `Developer: Reload Window` before opening the CodeWalk sidebar. A reload badge on the Extensions view or a sidebar that stays on a loading bar means the window has not reloaded yet.
 
 The installer:
 
 - downloads the latest hosted `.vsix`
+- validates that the archive contains the compiled extension entrypoint and runtime dependencies before installation
 - installs it with the VS Code `code` CLI
+- verifies that VS Code extracted the expected runtime files after installation
 - optionally installs the `codewalk-yaml-contract` skill file
 - offers common Codex and Claude Code skill directories, plus a custom path
 
@@ -129,6 +135,7 @@ Prerequisites:
 
 - `bash`
 - `curl`
+- `zipinfo`
 - the VS Code `code` CLI on your `PATH`
 
 If you do not have the `code` CLI available, install the extension manually:
@@ -137,12 +144,23 @@ If you do not have the `code` CLI available, install the extension manually:
 2. In VS Code, open the Command Palette.
 3. Run `Extensions: Install from VSIX...`
 4. Select the downloaded `.vsix` file.
+5. Run `Developer: Reload Window` if VS Code does not reload automatically.
 
-You can also install from a local clone:
+You can also install the tracked VSIX from a local clone:
 
 ```bash
-bash scripts/install-extension.sh
+bash dev/install-extension.sh
 ```
+
+If you want to install a VSIX you built from your local source instead of the tracked `downloads/code-walkthrough.vsix`, package it first and then install that file:
+
+```bash
+npm install
+npm run package:vsix
+code --install-extension ./code-walkthrough-0.1.0.vsix
+```
+
+Then reload the current VS Code window.
 
 ## Build And Refresh The Hosted `.vsix`
 

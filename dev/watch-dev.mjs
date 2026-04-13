@@ -5,7 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const demoPath = path.join(workspaceRoot, "demo");
+const demoPath = path.join(workspaceRoot, "dev", "demo");
 
 function isExecutable(filePath) {
   try {

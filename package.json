@@ -4,6 +4,10 @@
   "description": "Play YAML-authored code walkthroughs inside VS Code.",
   "version": "0.1.0",
   "publisher": "julesberman",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/julesberman/codewalk.git"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.95.0"
@@ -98,6 +102,15 @@
           "type": "string",
           "default": ".walkthroughs",
           "description": "Workspace-relative folder used to discover walkthrough YAML files."
+        },
+        "walkthrough.uiTypographyPreset": {
+          "type": "string",
+          "enum": [
+            "monaspaceNeon",
+            "system"
+          ],
+          "default": "monaspaceNeon",
+          "markdownDescription": "Typography preset for walkthrough webviews. `monaspaceNeon` bundles Monaspace locally; `system` uses the default VS Code font stacks."
         }
       }
     },
@@ -121,25 +134,25 @@
     "yamlValidation": [
       {
         "fileMatch": ".walkthroughs/*.yaml",
-        "url": "./walkthrough.schema.json"
+        "url": "./src/walkthrough.schema.json"
       },
       {
         "fileMatch": ".walkthroughs/*.yml",
-        "url": "./walkthrough.schema.json"
+        "url": "./src/walkthrough.schema.json"
       }
     ]
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "validate:walkthrough": "node ./out/scripts/validateWalkthrough.js",
+    "validate:walkthrough": "node ./out/dev/validateWalkthrough.js",
     "vscode:prepublish": "npm run compile",
     "package:vsix": "vsce package --allow-missing-repository",
     "package": "npm run package:vsix",
     "watch:tsc": "tsc -watch -p ./",
-    "watch": "node ./scripts/watch-dev.mjs",
+    "watch": "node ./dev/watch-dev.mjs",
     "lint": "tsc -p ./ --noEmit",
     "pretest": "npm run compile",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/src/test/runTest.js"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

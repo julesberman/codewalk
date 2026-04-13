@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { validateWalkthroughFile } from "../../src/walkthroughValidation";
+import { validateWalkthroughFile } from "../../walkthroughValidation";
 
 const execFileAsync = promisify(execFile);
 
@@ -188,9 +188,9 @@ steps:
       "invalid.yaml",
     );
 
-    const scriptPath = path.resolve(__dirname, "../../scripts/validateWalkthrough.js");
+    const scriptPath = path.resolve(__dirname, "../../../dev/validateWalkthrough.js");
     const validRun = await execFileAsync(process.execPath, [scriptPath, validPath], {
-      cwd: path.resolve(__dirname, "../.."),
+      cwd: path.resolve(__dirname, "../../.."),
     });
 
     assert.match(validRun.stdout, /Walkthrough validation passed/);

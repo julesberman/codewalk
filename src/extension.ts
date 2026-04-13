@@ -176,7 +176,7 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
   }
 
   private async openSettings(): Promise<void> {
-    await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${this.context.extension.id}`);
+    await vscode.commands.executeCommand("workbench.action.openSettings", "walkthrough.libraryLocation");
   }
 
   private async next(): Promise<void> {

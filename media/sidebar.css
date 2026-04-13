@@ -93,6 +93,7 @@ a:hover {
 
 .walkthrough-button,
 .browse-icon-button,
+.browse-path-button,
 .step-button,
 .icon-button,
 .footer-button {
@@ -110,6 +111,7 @@ a:hover {
 
 .walkthrough-button:focus-visible,
 .browse-icon-button:focus-visible,
+.browse-path-button:focus-visible,
 .step-button:focus-visible,
 .icon-button:focus-visible,
 .footer-button:focus-visible,
@@ -187,7 +189,11 @@ a:focus-visible {
   color: var(--vscode-textLink-foreground, var(--color-active));
 }
 
-.browse-eyebrow-path {
+.browse-path-button {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -203,6 +209,12 @@ a:focus-visible {
   text-decoration-style: dotted;
   text-decoration-color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
   text-underline-offset: 0.18em;
+}
+
+.browse-path-button:hover,
+.browse-path-button:focus-visible {
+  color: var(--vscode-textLink-foreground, var(--color-active));
+  text-decoration-color: currentColor;
 }
 
 .browse-icon-button {

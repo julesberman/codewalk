@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { getExplanationFontSizePx } from "./config";
+import { getExplanationFontSizePx, getUiTypographyPreset } from "./config";
 import { type PlaybackState } from "./types";
 import { getSharedUiTokenCss } from "./uiTokens";
 
@@ -71,11 +71,16 @@ export class ExplanationPanelManager implements vscode.Disposable {
   private getHtml(webview: vscode.Webview, playback: PlaybackState): string {
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "explanation.css"));
     const markdownScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "markdown.js"));
+    const monaspaceNeonFontUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "media", "fonts", "Monaspace Neon Var.woff2"),
+    );
     const step = playback.walkthrough.steps[playback.currentStepIndex];
     const nonce = createNonce();
     const serializedExplanation = serializeForScript(step.explanation);
     const sharedTokenCss = getSharedUiTokenCss({
       panelExplanationSizePx: getExplanationFontSizePx(),
+      monaspaceNeonFontUri: monaspaceNeonFontUri.toString(),
+      typographyPreset: getUiTypographyPreset(),
     });
 
     return `<!DOCTYPE html>
@@ -84,7 +89,7 @@ export class ExplanationPanelManager implements vscode.Disposable {
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
+      content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style nonce="${nonce}">${sharedTokenCss}</style>

@@ -9,6 +9,9 @@ const DEFAULT_HIGHLIGHT_COLOR = "editor.wordHighlightBackground";
 const DEFAULT_EXPLANATION_PANEL_OPEN = false;
 const DEFAULT_EXPLANATION_FONT_SIZE_PX = 14;
 const DEFAULT_LIBRARY_LOCATION = ".walkthroughs";
+const DEFAULT_UI_TYPOGRAPHY_PRESET = "monaspaceNeon";
+
+export type UiTypographyPreset = "monaspaceNeon" | "system";
 
 export function getWalkthroughConfiguration(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -62,6 +65,15 @@ export function getWalkLibraryLocation(): string {
   const configured = getWalkthroughConfiguration().get<string>("libraryLocation", DEFAULT_LIBRARY_LOCATION);
   const normalized = normalizeLibraryLocation(configured);
   return normalized ?? DEFAULT_LIBRARY_LOCATION;
+}
+
+export function getUiTypographyPreset(): UiTypographyPreset {
+  const configured = getWalkthroughConfiguration().get<string>(
+    "uiTypographyPreset",
+    DEFAULT_UI_TYPOGRAPHY_PRESET,
+  );
+
+  return configured === "system" ? "system" : "monaspaceNeon";
 }
 
 export function toAbsoluteLibraryPath(workspaceRoot: string): string {

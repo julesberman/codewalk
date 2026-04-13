@@ -104,7 +104,7 @@ title: How the auth flow works
 description: A tour of the token validation pipeline.
 steps:
   - title: Entry point
-    file: demo/src/auth.ts
+    file: dev/demo/src/auth.ts
     range:
       start: 43
       end: 58
@@ -113,7 +113,7 @@ steps:
       bearer token off the `Authorization` header.
 
   - title: Signature check
-    file: demo/src/auth.ts
+    file: dev/demo/src/auth.ts
     range:
       start: 51
       end: 58
@@ -126,7 +126,7 @@ steps:
 title: Request lifecycle
 steps:
   - title: Request enters middleware
-    file: demo/src/middleware.ts
+    file: dev/demo/src/middleware.ts
     range:
       start: 15
       end: 21
@@ -135,7 +135,7 @@ steps:
       context with the authenticated user attached.
 
   - title: Route dispatch
-    file: demo/src/routes.ts
+    file: dev/demo/src/routes.ts
     range:
       start: 83
       end: 112
