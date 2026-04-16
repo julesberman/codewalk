@@ -10,70 +10,46 @@ const DEFAULT_EXPLANATION_PANEL_OPEN = false;
 const DEFAULT_EXPLANATION_FONT_SIZE_PX = 14;
 const DEFAULT_LIBRARY_LOCATION = ".walkthroughs";
 const DEFAULT_UI_TYPOGRAPHY_PRESET = "monaspaceNeon";
+const PRESENTATION_CONFIG_KEYS = [
+  "walkthrough.libraryLocation",
+  "walkthrough.dimmingStrength",
+  "walkthrough.highlightColor",
+  "walkthrough.explanationFontSizePx",
+  "walkthrough.uiTypographyPreset",
+] as const;
 
 export type UiTypographyPreset = "monaspaceNeon" | "system";
 
-export function getWalkthroughConfiguration(): vscode.WorkspaceConfiguration {
-  return vscode.workspace.getConfiguration(CONFIG_SECTION);
-}
-
 export function getEditorTopPaddingLines(): number {
-  const configured = getWalkthroughConfiguration().get<number>("editorTopPaddingLines", DEFAULT_EDITOR_TOP_PADDING_LINES);
-  if (typeof configured !== "number" || !Number.isFinite(configured)) {
-    return DEFAULT_EDITOR_TOP_PADDING_LINES;
-  }
-
-  return Math.max(0, Math.floor(configured));
+  return coerceWholeNumber(readConfig("editorTopPaddingLines"), DEFAULT_EDITOR_TOP_PADDING_LINES, 0);
 }
 
 export function getDimmingStrength(): number {
-  const configured = getWalkthroughConfiguration().get<number>("dimmingStrength", DEFAULT_DIMMING_STRENGTH);
-  if (typeof configured !== "number" || !Number.isFinite(configured)) {
-    return DEFAULT_DIMMING_STRENGTH;
-  }
-
-  return clamp(configured, 0, 1);
+  return coerceNumber(readConfig("dimmingStrength"), DEFAULT_DIMMING_STRENGTH, 0, 1);
 }
 
 export function getHighlightColor(): vscode.ThemeColor | string {
-  const configured = getWalkthroughConfiguration().get<string>("highlightColor", DEFAULT_HIGHLIGHT_COLOR)?.trim();
-  if (!configured) {
-    return new vscode.ThemeColor(DEFAULT_HIGHLIGHT_COLOR);
-  }
-
-  if (/^[A-Za-z][A-Za-z0-9.]+$/.test(configured)) {
-    return new vscode.ThemeColor(configured);
-  }
-
-  return configured;
+  return parseHighlightColor(readConfig("highlightColor"));
 }
 
 export function getExplanationPanelOpenByDefault(): boolean {
-  return getWalkthroughConfiguration().get<boolean>("explanationPanelOpenByDefault", DEFAULT_EXPLANATION_PANEL_OPEN) === true;
+  return readConfig("explanationPanelOpenByDefault") === true;
 }
 
 export function getExplanationFontSizePx(): number {
-  const configured = getWalkthroughConfiguration().get<number>("explanationFontSizePx", DEFAULT_EXPLANATION_FONT_SIZE_PX);
-  if (typeof configured !== "number" || !Number.isFinite(configured)) {
-    return DEFAULT_EXPLANATION_FONT_SIZE_PX;
-  }
-
-  return Math.max(10, Math.floor(configured));
+  return coerceWholeNumber(readConfig("explanationFontSizePx"), DEFAULT_EXPLANATION_FONT_SIZE_PX, 10);
 }
 
 export function getWalkLibraryLocation(): string {
-  const configured = getWalkthroughConfiguration().get<string>("libraryLocation", DEFAULT_LIBRARY_LOCATION);
-  const normalized = normalizeLibraryLocation(configured);
-  return normalized ?? DEFAULT_LIBRARY_LOCATION;
+  return normalizeLibraryLocation(readConfig("libraryLocation")) ?? DEFAULT_LIBRARY_LOCATION;
 }
 
 export function getUiTypographyPreset(): UiTypographyPreset {
-  const configured = getWalkthroughConfiguration().get<string>(
-    "uiTypographyPreset",
-    DEFAULT_UI_TYPOGRAPHY_PRESET,
-  );
+  return resolveTypographyPreset(readConfig("uiTypographyPreset"));
+}
 
-  return configured === "system" ? "system" : "monaspaceNeon";
+export function affectsWalkthroughPresentation(event: vscode.ConfigurationChangeEvent): boolean {
+  return PRESENTATION_CONFIG_KEYS.some((key) => event.affectsConfiguration(key));
 }
 
 export function toAbsoluteLibraryPath(workspaceRoot: string): string {
@@ -87,11 +63,23 @@ export function isWalkthroughFilePath(filePath: string, workspaceRoot: string): 
   return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
+export function coerceNumber(value: unknown, fallback: number, minimum: number, maximum: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function normalizeLibraryLocation(value: string | undefined): string | null {
+export function coerceWholeNumber(value: unknown, fallback: number, minimum: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(minimum, Math.floor(value));
+}
+
+export function normalizeLibraryLocation(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -102,4 +90,21 @@ function normalizeLibraryLocation(value: string | undefined): string | null {
   }
 
   return trimmed;
+}
+
+export function resolveTypographyPreset(value: unknown): UiTypographyPreset {
+  return value === "system" ? "system" : "monaspaceNeon";
+}
+
+function readConfig(key: string): unknown {
+  return vscode.workspace.getConfiguration(CONFIG_SECTION).get(key);
+}
+
+function parseHighlightColor(value: unknown): vscode.ThemeColor | string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return new vscode.ThemeColor(DEFAULT_HIGHLIGHT_COLOR);
+  }
+
+  const configured = value.trim();
+  return /^[A-Za-z][A-Za-z0-9.]+$/.test(configured) ? new vscode.ThemeColor(configured) : configured;
 }

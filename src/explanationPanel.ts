@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 
 import { getExplanationFontSizePx, getUiTypographyPreset } from "./config";
+import { renderMarkdownHtml } from "./markdown";
 import { type PlaybackState } from "./types";
 import { getSharedUiTokenCss } from "./uiTokens";
+import { createWebviewDocument, escapeHtml, getWebviewUri } from "./webview";
 
 export class ExplanationPanelManager implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -18,7 +20,7 @@ export class ExplanationPanelManager implements vscode.Disposable {
     const step = playback.walkthrough.steps[playback.currentStepIndex];
 
     panel.title = `Explanation: ${step.title}`;
-    panel.webview.html = this.getHtml(panel.webview, playback);
+    panel.webview.html = renderExplanationDocument(panel.webview, this.context.extensionUri, playback);
     panel.reveal(vscode.ViewColumn.Beside, true);
   }
 
@@ -50,7 +52,7 @@ export class ExplanationPanelManager implements vscode.Disposable {
         preserveFocus: true,
       },
       {
-        enableScripts: true,
+        enableScripts: false,
         localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media")],
       },
     );
@@ -67,67 +69,34 @@ export class ExplanationPanelManager implements vscode.Disposable {
     this.panel = panel;
     return panel;
   }
+}
 
-  private getHtml(webview: vscode.Webview, playback: PlaybackState): string {
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "explanation.css"));
-    const markdownScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "markdown.js"));
-    const monaspaceNeonFontUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, "media", "fonts", "Monaspace Neon Var.woff2"),
-    );
-    const step = playback.walkthrough.steps[playback.currentStepIndex];
-    const nonce = createNonce();
-    const serializedExplanation = serializeForScript(step.explanation);
-    const sharedTokenCss = getSharedUiTokenCss({
-      panelExplanationSizePx: getExplanationFontSizePx(),
-      monaspaceNeonFontUri: monaspaceNeonFontUri.toString(),
-      typographyPreset: getUiTypographyPreset(),
-    });
+export function renderExplanationDocument(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  playback: PlaybackState,
+): string {
+  const step = playback.walkthrough.steps[playback.currentStepIndex];
+  const styleUri = getWebviewUri(webview, extensionUri, "media", "explanation.css");
+  const fontUri = getWebviewUri(webview, extensionUri, "media", "fonts", "Monaspace Neon Var.woff2");
+  const sharedTokenCss = getSharedUiTokenCss({
+    panelExplanationSizePx: getExplanationFontSizePx(),
+    monaspaceNeonFontUri: fontUri,
+    typographyPreset: getUiTypographyPreset(),
+  });
 
-    return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
-    />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style nonce="${nonce}">${sharedTokenCss}</style>
-    <link nonce="${nonce}" rel="stylesheet" href="${styleUri.toString()}" />
-    <title>Explanation</title>
-  </head>
-  <body>
-    <main class="page">
+  return createWebviewDocument(webview, {
+    title: "Explanation",
+    sharedCss: sharedTokenCss,
+    styleUris: [styleUri],
+    allowImages: true,
+    body: `    <main class="page">
       <header class="header">
         <div class="eyebrow">${escapeHtml(playback.walkthrough.title)}</div>
         <h1 class="title">${escapeHtml(step.title)}</h1>
         <div class="meta">${escapeHtml(step.file)} · Lines ${step.range.start}-${step.range.end}</div>
       </header>
-      <section id="content" class="content markdown"></section>
-    </main>
-    <script nonce="${nonce}" src="${markdownScriptUri.toString()}"></script>
-    <script nonce="${nonce}">
-      const content = document.getElementById("content");
-      window.WalkthroughMarkdown?.renderInto(content, ${serializedExplanation});
-    </script>
-  </body>
-</html>`;
-  }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function createNonce(): string {
-  return Math.random().toString(36).slice(2, 12);
-}
-
-function serializeForScript(value: string): string {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+      <section class="content markdown">${renderMarkdownHtml(step.explanation)}</section>
+    </main>`,
+  });
 }

@@ -14,6 +14,8 @@ suite("UI tokens", () => {
     assert.match(css, /--font-family-body: "Monaspace Neon Var"/);
     assert.match(css, /--font-family-title: "Monaspace Neon Var"/);
     assert.match(css, /--font-family-mono: "Monaspace Neon Var"/);
+    assert.match(css, /\.markdown pre \{/);
+    assert.match(css, /\*, \*::before, \*::after \{/);
   });
 
   test("keeps existing stacks when system typography is selected", () => {

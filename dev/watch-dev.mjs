@@ -66,7 +66,7 @@ const codeCommand = resolveCodeCommand();
 
 runOrExit("npm", ["run", "compile"]);
 
-const watcher = spawn("npx", ["tsc", "--watch", "-p", "./"], {
+const watcher = spawn("npm", ["run", "watch:tsc"], {
   cwd: workspaceRoot,
   stdio: "inherit"
 });

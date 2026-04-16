@@ -1,16 +1,32 @@
 import * as assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import { createFixtureWorkspace } from "./fixtures";
+
 suite("Extension smoke", () => {
-  test("start, navigate, and exit walkthrough commands", async function () {
-    const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "walkthrough-ext-"));
-    const workspaceUri = vscode.Uri.file(workspaceRoot);
+  test("start, navigate, exit, and recover from an invalid walkthrough", async function () {
+    const fixture = await createFixtureWorkspace("walkthrough-ext-");
+    await fixture.writeWalkthrough(`
+title: Sample tour
+steps:
+  - title: Intro
+    file: src.ts
+    range:
+      start: 1
+      end: 1
+    explanation: first
+  - title: Second
+    file: src.ts
+    range:
+      start: 2
+      end: 3
+    explanation: second
+`);
+    await fixture.writeWalkthrough("title: broken:\nsteps: []\n", "broken.yaml");
+
     const added = vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length ?? 0, {
-      uri: workspaceUri,
+      uri: vscode.Uri.file(fixture.root),
       name: "walkthrough-fixture",
     });
     assert.equal(added, true);
@@ -20,30 +36,8 @@ suite("Extension smoke", () => {
     assert.ok(extension, "Expected extension metadata");
     await extension?.activate();
 
-    await fs.mkdir(path.join(workspaceRoot, ".walkthroughs"), { recursive: true });
-    await fs.writeFile(path.join(workspaceRoot, "sample.ts"), ["alpha", "beta", "gamma", "delta"].join("\n"));
-    await fs.writeFile(
-      path.join(workspaceRoot, ".walkthroughs", "tour.yaml"),
-      `
-title: Sample tour
-steps:
-  - title: Intro
-    file: sample.ts
-    range:
-      start: 1
-      end: 1
-    explanation: first
-  - title: Second
-    file: sample.ts
-    range:
-      start: 2
-      end: 3
-    explanation: second
-`.trimStart(),
-    );
-
-    await vscode.commands.executeCommand("walkthrough.start", ".walkthroughs/tour.yaml");
-    await waitForEditor("sample.ts");
+    await vscode.commands.executeCommand("walkthrough.start", ".walkthroughs/demo.yaml");
+    await waitForEditor("src.ts");
     assert.equal(vscode.window.activeTextEditor?.selection.active.line, 0);
 
     await vscode.commands.executeCommand("walkthrough.next");
@@ -52,17 +46,13 @@ steps:
     await vscode.commands.executeCommand("walkthrough.previous");
     await waitForSelectionLine(0);
 
-    await vscode.commands.executeCommand("walkthrough.start", ".walkthroughs/tour.yaml");
-    await waitForSelectionLine(0);
-
-    await vscode.commands.executeCommand("walkthrough.next");
-    await waitForSelectionLine(2);
     await vscode.commands.executeCommand("walkthrough.exit");
 
-    const editor = vscode.window.activeTextEditor;
-    assert.ok(editor);
-    const decorationProbe = editor?.visibleRanges.length ?? 0;
-    assert.ok(decorationProbe >= 0);
+    await vscode.commands.executeCommand("walkthrough.start", ".walkthroughs/broken.yaml");
+    await waitFor(() => (vscode.window.activeTextEditor?.document.fileName.endsWith("src.ts") ?? false));
+
+    await vscode.commands.executeCommand("walkthrough.start", ".walkthroughs/demo.yaml");
+    await waitForSelectionLine(0);
   });
 });
 

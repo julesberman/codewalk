@@ -10,27 +10,17 @@ export interface WalkthroughStep {
   explanation: string;
 }
 
-export interface WalkthroughDocument {
-  title: string;
-  description?: string;
-  steps: WalkthroughStep[];
-}
-
 export interface WalkthroughSummary {
-  id: string;
   fileName: string;
   relativePath: string;
   title: string;
   description?: string;
-  updatedAt: number;
   error?: WalkthroughErrorState;
 }
 
-export interface WalkthroughFile extends WalkthroughSummary {
-  absolutePath: string;
+export interface Walkthrough extends WalkthroughSummary {
+  steps: WalkthroughStep[];
 }
-
-export interface ValidatedWalkthrough extends WalkthroughFile, WalkthroughDocument {}
 
 export interface WalkthroughErrorState {
   title: string;
@@ -39,7 +29,7 @@ export interface WalkthroughErrorState {
 }
 
 export interface PlaybackState {
-  walkthrough: ValidatedWalkthrough;
+  walkthrough: Walkthrough;
   currentStepIndex: number;
   explanationPanelVisible: boolean;
 }

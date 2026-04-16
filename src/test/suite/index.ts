@@ -8,10 +8,17 @@ export async function run(): Promise<void> {
     color: true,
   });
 
-  mocha.addFile(path.resolve(__dirname, "loader.test.js"));
-  mocha.addFile(path.resolve(__dirname, "uiTokens.test.js"));
-  mocha.addFile(path.resolve(__dirname, "validator.test.js"));
-  mocha.addFile(path.resolve(__dirname, "extension.test.js"));
+  for (const file of [
+    "config.test.js",
+    "loader.test.js",
+    "playback.test.js",
+    "uiTokens.test.js",
+    "validator.test.js",
+    "webview.test.js",
+    "extension.test.js",
+  ]) {
+    mocha.addFile(path.resolve(__dirname, file));
+  }
 
   await new Promise<void>((resolve, reject) => {
     mocha.run((failures: number) => {

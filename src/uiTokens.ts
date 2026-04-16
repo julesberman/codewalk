@@ -1,120 +1,118 @@
 import { type UiTypographyPreset } from "./config";
 
-interface SharedUiTokenSections {
-  fonts: Record<string, string>;
-  fontSizes: Record<string, string>;
-  colors: Record<string, string>;
-  layout: Record<string, string>;
-}
-
 export interface SharedUiTokenOptions {
   panelExplanationSizePx?: number;
   monaspaceNeonFontUri?: string;
   typographyPreset?: UiTypographyPreset;
 }
 
-export const sharedUiTokens = {
-  fonts: {
-    // Serif face for major titles and section headings.
-    titleFamily: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
-    // Default font for body copy and controls.
-    bodyFamily: "var(--vscode-font-family)",
-    // Monospace font for labels, metadata, and code.
-    monoFamily: "var(--vscode-editor-font-family)",
-  },
-  fontSizes: {
-    // Base size for standard UI text.
-    bodySize: "13px",
-    // Small uppercase size for metadata and counters.
-    metaSize: "11px",
-    // Large responsive size for top-level titles.
-    titleSize: "clamp(1.75rem, 1.55rem + 0.8vw, 2.25rem)",
-    // Medium heading size for section titles.
-    sectionTitleSize: "1.35rem",
-    // Reading size for explanation text in the sidebar.
-    sidebarExplanationSize: "0.8rem",
-    // Reading size for explanation text in the panel.
-    panelExplanationSize: "1.1rem",
-  },
-  colors: {
-    // Primary text color across both webviews.
-    textColor: "var(--vscode-foreground)",
-    // Softer text for labels and supporting copy.
-    mutedTextColor: "color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-editor-background))",
-    // Divider and border color for structural rules.
-    ruleColor: "color-mix(in srgb, var(--vscode-foreground) 12%, transparent)",
-    // Surface fill for inline code and panels.
-    surfaceColor: "color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-sideBar-background))",
-    // Hover background for clickable rows and buttons.
-    hoverColor: "color-mix(in srgb, var(--vscode-list-hoverBackground) 75%, transparent)",
-    // Accent color for active and highlighted states.
-    activeColor: "color-mix(in srgb, var(--vscode-focusBorder) 60%, var(--vscode-foreground))",
-    // Error text and destructive action color.
-    errorColor: "var(--vscode-errorForeground)",
-  },
-  layout: {
-    // Horizontal page padding for the sidebar shell.
-    pagePaddingInline: "0px",
-    // Vertical page padding for the sidebar shell.
-    pagePaddingBlock: "20px",
-    // Maximum width for the main sidebar column.
-    contentMaxWidth: "100%",
-  },
-} satisfies SharedUiTokenSections;
+const baseFonts = {
+  titleFamily: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
+  bodyFamily: "var(--vscode-font-family)",
+  monoFamily: "var(--vscode-editor-font-family)",
+};
 
 export function getSharedUiTokenCss(options: SharedUiTokenOptions = {}): string {
-  const typographyPreset = options.typographyPreset ?? "monaspaceNeon";
-  const fontSizes = {
-    ...sharedUiTokens.fontSizes,
-    panelExplanationSize:
-      typeof options.panelExplanationSizePx === "number"
-        ? `${options.panelExplanationSizePx}px`
-        : sharedUiTokens.fontSizes.panelExplanationSize,
-  };
-  const activeFonts = getActiveFonts(typographyPreset);
+  const fonts = getActiveFonts(options.typographyPreset ?? "monaspaceNeon");
+  const panelExplanationSize = typeof options.panelExplanationSizePx === "number"
+    ? `${options.panelExplanationSizePx}px`
+    : "1.1rem";
 
   const lines = [
-    ...getFontFaceCss(options.monaspaceNeonFontUri),
+    ...getFontFaceCss(options.monaspaceNeonFontUri, options.typographyPreset ?? "monaspaceNeon"),
+    "*, *::before, *::after {",
+    "  box-sizing: border-box;",
+    "}",
     ":root {",
     "  color-scheme: light dark;",
-    ...toCssVariables({
-      "font-family-title": activeFonts.titleFamily,
-      "font-family-body": activeFonts.bodyFamily,
-      "font-family-mono": activeFonts.monoFamily,
-      "font-size-body": fontSizes.bodySize,
-      "font-size-meta": fontSizes.metaSize,
-      "font-size-title": fontSizes.titleSize,
-      "font-size-section-title": fontSizes.sectionTitleSize,
-      "font-size-sidebar-explanation": fontSizes.sidebarExplanationSize,
-      "font-size-panel-explanation": fontSizes.panelExplanationSize,
-      "color-text": sharedUiTokens.colors.textColor,
-      "color-text-muted": getSidebarMutedTextColor(),
-      "color-text-muted-panel": sharedUiTokens.colors.mutedTextColor,
-      "color-rule": sharedUiTokens.colors.ruleColor,
-      "color-surface": sharedUiTokens.colors.surfaceColor,
-      "color-hover": sharedUiTokens.colors.hoverColor,
-      "color-active": sharedUiTokens.colors.activeColor,
-      "color-error": sharedUiTokens.colors.errorColor,
-      "layout-page-padding-inline": sharedUiTokens.layout.pagePaddingInline,
-      "layout-page-padding-block": sharedUiTokens.layout.pagePaddingBlock,
-      "layout-content-max-width": sharedUiTokens.layout.contentMaxWidth,
-    }),
+    `  --font-family-title: ${fonts.titleFamily};`,
+    `  --font-family-body: ${fonts.bodyFamily};`,
+    `  --font-family-mono: ${fonts.monoFamily};`,
+    "  --font-size-body: 13px;",
+    "  --font-size-meta: 11px;",
+    "  --font-size-title: clamp(1.75rem, 1.55rem + 0.8vw, 2.25rem);",
+    "  --font-size-section-title: 1.35rem;",
+    "  --font-size-sidebar-explanation: 0.8rem;",
+    `  --font-size-panel-explanation: ${panelExplanationSize};`,
+    "  --color-text: var(--vscode-foreground);",
+    "  --color-text-muted: color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-sideBar-background));",
+    "  --color-text-muted-panel: color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-editor-background));",
+    "  --color-rule: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);",
+    "  --color-surface: color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-sideBar-background));",
+    "  --color-hover: color-mix(in srgb, var(--vscode-list-hoverBackground) 75%, transparent);",
+    "  --color-active: color-mix(in srgb, var(--vscode-focusBorder) 60%, var(--vscode-foreground));",
+    "  --color-error: var(--vscode-errorForeground);",
+    "  --layout-page-padding-inline: 0px;",
+    "  --layout-page-padding-block: 20px;",
+    "  --layout-content-max-width: 100%;",
+    "}",
+    "a {",
+    "  color: inherit;",
+    "  text-decoration-color: color-mix(in srgb, var(--vscode-foreground) 30%, transparent);",
+    "  text-underline-offset: 0.18em;",
+    "}",
+    "a:hover {",
+    "  text-decoration-color: currentColor;",
+    "}",
+    ".markdown {",
+    "  display: grid;",
+    "  gap: var(--markdown-gap, 12px);",
+    "  font-size: var(--markdown-font-size, inherit);",
+    "  line-height: var(--markdown-line-height, inherit);",
+    "}",
+    ".markdown p,",
+    ".markdown ul,",
+    ".markdown ol,",
+    ".markdown pre,",
+    ".markdown blockquote,",
+    ".markdown h1,",
+    ".markdown h2,",
+    ".markdown h3,",
+    ".markdown h4 {",
+    "  margin: 0;",
+    "}",
+    ".markdown h1,",
+    ".markdown h2,",
+    ".markdown h3,",
+    ".markdown h4 {",
+    "  font-family: var(--font-family-title);",
+    "  font-weight: 500;",
+    "  line-height: var(--markdown-heading-line-height, 1.2);",
+    "}",
+    ".markdown ul,",
+    ".markdown ol {",
+    "  padding-left: 1.2rem;",
+    "}",
+    ".markdown li + li {",
+    "  margin-top: var(--markdown-list-item-gap, 0.25rem);",
+    "}",
+    ".markdown code {",
+    "  font-family: var(--font-family-mono);",
+    "  font-size: 0.93em;",
+    "  padding: 0.08rem 0.22rem;",
+    "  background: var(--color-surface);",
+    "}",
+    ".markdown pre {",
+    "  overflow: auto;",
+    "  padding: 12px 14px;",
+    "  background: var(--color-surface);",
+    "  border: 1px solid var(--color-rule);",
+    "}",
+    ".markdown pre code {",
+    "  padding: 0;",
+    "  background: transparent;",
     "}",
   ];
 
   return lines.join("\n");
 }
 
-function toCssVariables(values: Record<string, string>): string[] {
-  return Object.entries(values).map(([name, value]) => `  --${name}: ${value};`);
-}
-
 function getActiveFonts(typographyPreset: UiTypographyPreset): Record<string, string> {
   if (typographyPreset === "system") {
-    return sharedUiTokens.fonts;
+    return baseFonts;
   }
 
-  const fallbackStack = sharedUiTokens.fonts;
+  const fallbackStack = baseFonts;
   const monaspaceStack = '"Monaspace Neon Var", "Monaspace Neon", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
   return {
@@ -124,8 +122,8 @@ function getActiveFonts(typographyPreset: UiTypographyPreset): Record<string, st
   };
 }
 
-function getFontFaceCss(fontUri: string | undefined): string[] {
-  if (!fontUri) {
+function getFontFaceCss(fontUri: string | undefined, typographyPreset: UiTypographyPreset): string[] {
+  if (!fontUri || typographyPreset === "system") {
     return [];
   }
 
@@ -138,8 +136,4 @@ function getFontFaceCss(fontUri: string | undefined): string[] {
     "  font-display: swap;",
     "}",
   ];
-}
-
-function getSidebarMutedTextColor(): string {
-  return "color-mix(in srgb, var(--vscode-foreground) 62%, var(--vscode-sideBar-background))";
 }

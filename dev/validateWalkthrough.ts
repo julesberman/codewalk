@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import { validateWalkthroughFile } from "../src/walkthroughValidation";
+import { validateWalkthroughFile } from "../src/walkthroughs";
 
 async function main(): Promise<void> {
   const inputPath = process.argv[2];

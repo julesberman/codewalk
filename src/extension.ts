@@ -1,18 +1,16 @@
-import * as path from "node:path";
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { isWalkthroughFilePath } from "./config";
-import { DecorationsManager } from "./decorations";
+import { affectsWalkthroughPresentation, isWalkthroughFilePath } from "./config";
 import { ExplanationPanelManager } from "./explanationPanel";
 import { WalkthroughPlayer, type PlayerObserver } from "./player";
 import { SidebarViewProvider } from "./sidebarView";
 import { type PlaybackState, type WalkthroughErrorState, type WalkthroughSummary } from "./types";
-import { WalkthroughLoader } from "./walkthroughLoader";
+import { discoverWalkthroughs, loadWalkthrough } from "./walkthroughs";
 
 class ExtensionController implements PlayerObserver, vscode.Disposable {
-  private readonly loader: WalkthroughLoader;
   private readonly player: WalkthroughPlayer;
   private readonly sidebar: SidebarViewProvider;
   private readonly explanationPanel: ExplanationPanelManager;
@@ -23,26 +21,23 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly workspaceRoot: string,
   ) {
-    const decorations = new DecorationsManager();
-    this.loader = new WalkthroughLoader(workspaceRoot);
-    this.player = new WalkthroughPlayer(workspaceRoot, decorations, this);
+    this.player = new WalkthroughPlayer(workspaceRoot, this);
     this.explanationPanel = new ExplanationPanelManager(context, async () => {
       await this.player.setExplanationPanelVisible(false);
     });
     this.sidebar = new SidebarViewProvider(context, {
-      startWalkthrough: async (relativePath) => this.startWalkthrough(relativePath),
-      editWalkthrough: async (relativePath) => this.editWalkthrough(relativePath),
-      deleteWalkthrough: async (relativePath) => this.deleteWalkthrough(relativePath),
+      startWalkthrough: async (relativePath) => this.start(relativePath),
+      editWalkthrough: async (relativePath) => this.edit(relativePath),
+      deleteWalkthrough: async (relativePath) => this.remove(relativePath),
       openSettings: async () => this.openSettings(),
-      next: async () => this.next(),
-      previous: async () => this.previous(),
-      jumpToStep: async (index) => this.jumpToStep(index),
-      toggleExplanationPanel: async () => this.toggleExplanationPanel(),
+      next: async () => this.runPlaybackAction(() => this.player.next()),
+      previous: async () => this.runPlaybackAction(() => this.player.previous()),
+      jumpToStep: async (index) => this.runPlaybackAction(() => this.player.jumpToStep(index)),
+      toggleExplanationPanel: async () => this.runPlaybackAction(() => this.player.toggleExplanationPanel()),
       exit: async () => this.exit(),
     });
 
     context.subscriptions.push(
-      decorations,
       this.player,
       this.explanationPanel,
       vscode.window.registerWebviewViewProvider(SidebarViewProvider.viewType, this.sidebar, {
@@ -52,45 +47,40 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
       }),
       vscode.commands.registerCommand("walkthrough.start", async (relativePath?: string) => {
         if (typeof relativePath === "string") {
-          await this.startWalkthrough(relativePath);
+          await this.start(relativePath);
           return;
         }
 
-        await this.refreshBrowseState();
+        await this.refreshLibrary();
         if (this.walkthroughs.length > 0) {
-          await this.startWalkthrough(this.walkthroughs[0].relativePath);
+          await this.start(this.walkthroughs[0].relativePath);
         }
       }),
-      vscode.commands.registerCommand("walkthrough.next", async () => this.next()),
-      vscode.commands.registerCommand("walkthrough.previous", async () => this.previous()),
+      vscode.commands.registerCommand("walkthrough.next", async () => this.runPlaybackAction(() => this.player.next())),
+      vscode.commands.registerCommand("walkthrough.previous", async () => this.runPlaybackAction(() => this.player.previous())),
       vscode.commands.registerCommand("walkthrough.exit", async () => this.exit()),
       vscode.window.onDidChangeActiveTextEditor(async (editor) => {
         await this.player.restoreDecorationsForVisibleEditor(editor);
       }),
-      vscode.workspace.onDidCreateFiles(async () => this.refreshBrowseState()),
-      vscode.workspace.onDidDeleteFiles(async () => this.refreshBrowseState()),
-      vscode.workspace.onDidRenameFiles(async () => this.refreshBrowseState()),
+      vscode.workspace.onDidCreateFiles(async () => this.refreshLibrary()),
+      vscode.workspace.onDidDeleteFiles(async () => this.refreshLibrary()),
+      vscode.workspace.onDidRenameFiles(async () => this.refreshLibrary()),
       vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (isWalkthroughFilePath(document.uri.fsPath, workspaceRoot)) {
-          await this.refreshBrowseState();
+          await this.refreshLibrary();
         }
       }),
       vscode.workspace.onDidChangeConfiguration(async (event) => {
-        if (
-          event.affectsConfiguration("walkthrough.libraryLocation")
-          || event.affectsConfiguration("walkthrough.dimmingStrength")
-          || event.affectsConfiguration("walkthrough.highlightColor")
-          || event.affectsConfiguration("walkthrough.explanationFontSizePx")
-        ) {
+        if (affectsWalkthroughPresentation(event)) {
           await this.player.refreshPresentation();
-          await this.refreshBrowseState();
+          await this.refreshLibrary();
         }
       }),
     );
   }
 
   public async initialize(): Promise<void> {
-    await this.refreshBrowseState();
+    await this.refreshLibrary();
   }
 
   public dispose(): void {
@@ -106,24 +96,25 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
     this.render(state);
   }
 
-  private async refreshBrowseState(): Promise<void> {
-    this.walkthroughs = await this.loader.discoverWalkthroughs();
+  private async refreshLibrary(): Promise<void> {
+    this.walkthroughs = await discoverWalkthroughs(this.workspaceRoot);
     this.render();
   }
 
-  private async startWalkthrough(relativePath: string): Promise<void> {
-    const result = await this.loader.loadWalkthrough(relativePath);
+  private async start(relativePath: string): Promise<void> {
+    const result = await loadWalkthrough(this.workspaceRoot, relativePath);
     if (!result.ok) {
       this.currentError = result.error;
       this.player.stop();
+      this.render(null);
       return;
     }
 
-    this.clearError();
+    this.currentError = null;
     await this.player.start(result.walkthrough);
   }
 
-  private async editWalkthrough(relativePath: string): Promise<void> {
+  private async edit(relativePath: string): Promise<void> {
     const fileUri = this.resolveWalkthroughUri(relativePath);
     if (!fileUri) {
       return;
@@ -136,7 +127,7 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
     });
   }
 
-  private async deleteWalkthrough(relativePath: string): Promise<void> {
+  private async remove(relativePath: string): Promise<void> {
     const fileUri = this.resolveWalkthroughUri(relativePath);
     if (!fileUri) {
       return;
@@ -158,65 +149,53 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
       await fs.unlink(fileUri.fsPath);
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code === "ENOENT") {
-        await this.refreshBrowseState();
-        return;
+      if (nodeError.code !== "ENOENT") {
+        throw error;
       }
-
-      throw error;
     }
 
     const playback = this.player.getState();
     if (playback?.walkthrough.relativePath === relativePath) {
-      this.clearError();
+      this.currentError = null;
       this.player.stop();
     }
 
-    await this.refreshBrowseState();
+    await this.refreshLibrary();
   }
 
   private async openSettings(): Promise<void> {
     await vscode.commands.executeCommand("workbench.action.openSettings", "walkthrough.libraryLocation");
   }
 
-  private async next(): Promise<void> {
-    this.clearError();
-    await this.player.next();
-  }
-
-  private async previous(): Promise<void> {
-    this.clearError();
-    await this.player.previous();
-  }
-
-  private async jumpToStep(index: number): Promise<void> {
-    this.clearError();
-    await this.player.jumpToStep(index);
-  }
-
-  private async toggleExplanationPanel(): Promise<void> {
-    this.clearError();
-    await this.player.toggleExplanationPanel();
-  }
-
   private async exit(): Promise<void> {
-    this.clearError();
+    this.currentError = null;
     this.player.stop();
-    await this.refreshBrowseState();
+    await this.refreshLibrary();
   }
 
-  private clearError(): void {
+  private async runPlaybackAction(action: () => Promise<void>): Promise<void> {
     this.currentError = null;
+    await action();
+
+    if (!this.player.getState()) {
+      this.render(null);
+    }
   }
 
   private render(playback: PlaybackState | null = this.player.getState()): void {
     if (playback) {
-      this.syncExplanationPanel(playback);
+      if (playback.explanationPanelVisible) {
+        this.explanationPanel.show(playback);
+      } else {
+        this.explanationPanel.hide();
+      }
+
       this.sidebar.showPlayback(this.walkthroughs, playback);
       return;
     }
 
     this.explanationPanel.hide();
+
     if (this.currentError) {
       this.sidebar.showError(this.walkthroughs, this.currentError);
       return;
@@ -225,21 +204,9 @@ class ExtensionController implements PlayerObserver, vscode.Disposable {
     this.sidebar.showBrowse(this.walkthroughs);
   }
 
-  private syncExplanationPanel(state: PlaybackState): void {
-    if (state.explanationPanelVisible) {
-      this.explanationPanel.show(state);
-    } else {
-      this.explanationPanel.hide();
-    }
-  }
-
   private resolveWalkthroughUri(relativePath: string): vscode.Uri | null {
     const absolutePath = path.resolve(this.workspaceRoot, relativePath);
-    if (!isWalkthroughFilePath(absolutePath, this.workspaceRoot)) {
-      return null;
-    }
-
-    return vscode.Uri.file(absolutePath);
+    return isWalkthroughFilePath(absolutePath, this.workspaceRoot) ? vscode.Uri.file(absolutePath) : null;
   }
 }
 

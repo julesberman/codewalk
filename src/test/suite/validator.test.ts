@@ -1,48 +1,28 @@
 import * as assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
 import { execFile } from "node:child_process";
+import * as path from "node:path";
 import { promisify } from "node:util";
 
-import { validateWalkthroughFile } from "../../walkthroughValidation";
+import { createFixtureWorkspace } from "./fixtures";
+import { validateWalkthroughFile } from "../../walkthroughs";
 
 const execFileAsync = promisify(execFile);
 
 describe("walkthrough validator", () => {
-  let workspaceRoot: string;
-
-  beforeEach(async () => {
-    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "walkthrough-validator-"));
-    await fs.mkdir(path.join(workspaceRoot, ".walkthroughs"));
-    await fs.writeFile(path.join(workspaceRoot, "src.ts"), ["one", "two", "three", "four"].join("\n"));
-  });
-
   it("accepts a valid walkthrough file", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
-title: Demo
-description: Sample
-steps:
-  - title: Intro
-    file: src.ts
-    range:
-      start: 1
-      end: 2
-    explanation: |
-      Hello
-`,
-    );
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(validWalkthrough());
 
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, true);
   });
 
-  it("rejects malformed YAML", async () => {
-    const walkthroughPath = await writeWalkthrough(workspaceRoot, "title: demo:\nsteps: []\n");
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+  it("rejects malformed yaml", async () => {
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough("title: demo:\nsteps: []\n");
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -51,9 +31,8 @@ steps:
   });
 
   it("rejects unexpected schema properties", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(`
 title: Demo
 steps:
   - title: Intro
@@ -63,9 +42,9 @@ steps:
       end: 1
     explanation: ok
 extra: nope
-`,
-    );
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+`);
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -73,29 +52,31 @@ extra: nope
     }
   });
 
-  it("rejects missing required fields", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
-title: Demo
+  it("rejects trimmed empty content", async () => {
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(`
+title: "   "
+description: "   "
 steps:
   - title: Intro
     file: src.ts
-    explanation: ok
-`,
-    );
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+    range:
+      start: 1
+      end: 1
+    explanation: "   "
+`);
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
-      assert.match(result.error.title, /Schema validation failed/);
+      assert.match(result.error.detail, /title must not be empty/);
     }
   });
 
   it("rejects missing referenced files", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(`
 title: Demo
 steps:
   - title: Intro
@@ -104,9 +85,9 @@ steps:
       start: 1
       end: 1
     explanation: ok
-`,
-    );
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+`);
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -115,9 +96,8 @@ steps:
   });
 
   it("rejects inverted line ranges", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(`
 title: Demo
 steps:
   - title: Intro
@@ -126,9 +106,9 @@ steps:
       start: 3
       end: 2
     explanation: ok
-`,
-    );
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+`);
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -137,9 +117,8 @@ steps:
   });
 
   it("rejects line ranges beyond the file length", async () => {
-    const walkthroughPath = await writeWalkthrough(
-      workspaceRoot,
-      `
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const walkthroughPath = await fixture.writeWalkthrough(`
 title: Demo
 steps:
   - title: Intro
@@ -148,9 +127,9 @@ steps:
       start: 1
       end: 99
     explanation: ok
-`,
-    );
-    const result = await validateWalkthroughFile(walkthroughPath, workspaceRoot);
+`);
+
+    const result = await validateWalkthroughFile(walkthroughPath, fixture.root);
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -158,24 +137,10 @@ steps:
     }
   });
 
-  it("validates walkthroughs through the CLI", async () => {
-    const validPath = await writeWalkthrough(
-      workspaceRoot,
-      `
-title: Demo
-steps:
-  - title: Intro
-    file: src.ts
-    range:
-      start: 1
-      end: 1
-    explanation: ok
-`,
-      "valid.yaml",
-    );
-    const invalidPath = await writeWalkthrough(
-      workspaceRoot,
-      `
+  it("validates walkthroughs through the cli", async () => {
+    const fixture = await createFixtureWorkspace("walkthrough-validator-");
+    const validPath = await fixture.writeWalkthrough(validWalkthrough(), "valid.yaml");
+    const invalidPath = await fixture.writeWalkthrough(`
 title: Demo
 steps:
   - title: Intro
@@ -184,9 +149,7 @@ steps:
       start: 9
       end: 10
     explanation: ok
-`,
-      "invalid.yaml",
-    );
+`, "invalid.yaml");
 
     const scriptPath = path.resolve(__dirname, "../../../dev/validateWalkthrough.js");
     const validRun = await execFileAsync(process.execPath, [scriptPath, validPath], {
@@ -197,7 +160,7 @@ steps:
 
     await assert.rejects(
       execFileAsync(process.execPath, [scriptPath, invalidPath], {
-        cwd: path.resolve(__dirname, "../.."),
+        cwd: path.resolve(__dirname, "../../.."),
       }),
       (error: unknown) => {
         assert.ok(error && typeof error === "object");
@@ -211,12 +174,17 @@ steps:
   });
 });
 
-async function writeWalkthrough(
-  workspaceRoot: string,
-  contents: string,
-  fileName = "demo.yaml",
-): Promise<string> {
-  const absolutePath = path.join(workspaceRoot, ".walkthroughs", fileName);
-  await fs.writeFile(absolutePath, contents.trimStart());
-  return absolutePath;
+function validWalkthrough(): string {
+  return `
+title: Demo
+description: Sample
+steps:
+  - title: Intro
+    file: src.ts
+    range:
+      start: 1
+      end: 2
+    explanation: |
+      Hello
+`.trimStart();
 }

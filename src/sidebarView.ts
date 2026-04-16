@@ -1,15 +1,14 @@
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-
 import * as vscode from "vscode";
 
 import { getUiTypographyPreset, getWalkLibraryLocation } from "./config";
+import { renderSidebarMarkup } from "./sidebarMarkup";
 import {
   type PlaybackState,
   type WalkthroughErrorState,
   type WalkthroughSummary,
 } from "./types";
 import { getSharedUiTokenCss } from "./uiTokens";
+import { createWebviewDocument, getWebviewUri } from "./webview";
 
 export interface SidebarController {
   startWalkthrough(relativePath: string): Promise<void>;
@@ -23,24 +22,31 @@ export interface SidebarController {
   exit(): Promise<void>;
 }
 
-type SidebarMode = "browse" | "playback" | "error";
+export type SidebarMode = "browse" | "playback" | "error";
 
-interface SidebarRenderState {
+export interface SidebarRenderState {
   mode: SidebarMode;
   walkthroughs: WalkthroughSummary[];
   playback: PlaybackState | null;
   error: WalkthroughErrorState | null;
   libraryLocation: string;
-  iconUris: SidebarIconUris;
 }
 
-interface SidebarIconUris {
+export interface SidebarIconUris {
   settings: string;
   edit: string;
   trash: string;
 }
 
-type SidebarMessage =
+interface SidebarClientState {
+  mode: SidebarMode;
+  playback: {
+    currentStepIndex: number;
+    stepCount: number;
+  } | null;
+}
+
+export type SidebarMessage =
   | { type: "ready" }
   | { type: "startWalkthrough"; relativePath: string }
   | { type: "editWalkthrough"; relativePath: string }
@@ -56,18 +62,17 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "walkthrough.sidebar";
 
   private webviewView: vscode.WebviewView | undefined;
-  private iconUris: SidebarIconUris | null = null;
+  private iconUris: SidebarIconUris = {
+    settings: "",
+    edit: "",
+    trash: "",
+  };
   private renderState: SidebarRenderState = {
     mode: "browse",
     walkthroughs: [],
     playback: null,
     error: null,
     libraryLocation: getWalkLibraryLocation(),
-    iconUris: {
-      settings: "",
-      edit: "",
-      trash: "",
-    },
   };
 
   public constructor(
@@ -96,11 +101,6 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "icons", "trash.svg"))
         .toString(),
     };
-    this.renderState = {
-      ...this.renderState,
-      iconUris: this.iconUris,
-    };
-
     webviewView.webview.onDidReceiveMessage((message: unknown) => {
       void this.handleMessage(message);
     });
@@ -127,34 +127,35 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async getHtml(webview: vscode.Webview): Promise<string> {
-    const mediaUri = vscode.Uri.joinPath(this.context.extensionUri, "media");
-    const markdownScriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "markdown.js"));
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.js"));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaUri, "sidebar.css"));
-    const monaspaceNeonFontUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(mediaUri, "fonts", "Monaspace Neon Var.woff2"),
+    const styleUri = getWebviewUri(webview, this.context.extensionUri, "media", "sidebar.css");
+    const scriptUri = getWebviewUri(webview, this.context.extensionUri, "media", "sidebar.js");
+    const monaspaceNeonFontUri = getWebviewUri(
+      webview,
+      this.context.extensionUri,
+      "media",
+      "fonts",
+      "Monaspace Neon Var.woff2",
     );
-    const templatePath = path.join(this.context.extensionPath, "media", "sidebar.html");
-    const template = await fs.readFile(templatePath, "utf8");
-    const nonce = createNonce();
     const sharedTokenCss = getSharedUiTokenCss({
-      monaspaceNeonFontUri: monaspaceNeonFontUri.toString(),
+      monaspaceNeonFontUri,
       typographyPreset: getUiTypographyPreset(),
     });
 
-    return template
-      .replaceAll("{{cspSource}}", webview.cspSource)
-      .replaceAll("{{markdownScriptUri}}", markdownScriptUri.toString())
-      .replaceAll("{{styleUri}}", styleUri.toString())
-      .replaceAll("{{scriptUri}}", scriptUri.toString())
-      .replaceAll("{{sharedTokenCss}}", sharedTokenCss)
-      .replaceAll("{{nonce}}", nonce);
+    return createWebviewDocument(webview, {
+      title: "Code Walkthrough",
+      body: '    <div id="app"></div>',
+      sharedCss: sharedTokenCss,
+      styleUris: [styleUri],
+      scriptUris: [scriptUri],
+      allowImages: true,
+    });
   }
 
   private postState(): void {
     this.webviewView?.webview.postMessage({
       type: "renderState",
-      payload: this.renderState,
+      state: toSidebarClientState(this.renderState),
+      markup: renderSidebarMarkup(this.renderState, this.iconUris),
     });
   }
 
@@ -170,9 +171,6 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       playback,
       error,
       libraryLocation: getWalkLibraryLocation(),
-      iconUris:
-        this.iconUris ??
-        this.renderState.iconUris,
     };
     this.postState();
   }
@@ -220,7 +218,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   }
 }
 
-function parseSidebarMessage(message: unknown): SidebarMessage | null {
+export function parseSidebarMessage(message: unknown): SidebarMessage | null {
   if (!isRecord(message) || typeof message.type !== "string") {
     return null;
   }
@@ -249,6 +247,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function createNonce(): string {
-  return Math.random().toString(36).slice(2, 12);
+function toSidebarClientState(state: SidebarRenderState): SidebarClientState {
+  return {
+    mode: state.mode,
+    playback: state.playback
+      ? {
+          currentStepIndex: state.playback.currentStepIndex,
+          stepCount: state.playback.walkthrough.steps.length,
+        }
+      : null,
+  };
 }
